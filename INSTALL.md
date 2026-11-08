@@ -23,7 +23,7 @@ As root:
 apt-get update && apt-get install -y git curl build-essential python3 caddy
 curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && apt-get install -y nodejs   # Node 24 or newer
 useradd --system --create-home --home-dir /opt/contextcore --shell /usr/sbin/nologin contextcore
-git clone https://github.com/maximnikmazin/contextcore.git /opt/contextcore/code
+git clone https://github.com/maximnikmazin/ContextCore.git /opt/contextcore/code
 cd /opt/contextcore/code && npm install --omit=dev
 NM_STATE=/opt/contextcore/state node server/init.mjs --first-agent <name>
 chown -R contextcore:contextcore /opt/contextcore
