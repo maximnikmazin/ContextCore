@@ -2,10 +2,17 @@
 
 **One knowledge base of your life and work, for all your AI agents, on your own server.**
 
-https://github.com/user-attachments/assets/447a8788-01fc-42e5-b35f-124ac148b1a3
+https://github.com/user-attachments/assets/049d5873-2e40-4c8c-9730-e6d4b5e91f42
 
 ContextCore is an open-source MCP server for Claude, ChatGPT, coding agents and any other app that supports remote
 MCP servers.
+
+## Why it exists
+
+I use several AI tools at the same time: Claude, ChatGPT, Grok, Codex, Perplexity. Every time, one of them knew part
+of the picture and the others didn't: a decision made in one chat, a fact told to another, a rule I fixed in a third.
+I kept explaining the same things again. So I built one place where everything is kept, the knowledge, the memory and
+the skills, and every agent reads and saves there.
 
 ## A knowledge base of your whole life and work
 
