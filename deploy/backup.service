@@ -1,0 +1,7 @@
+[Unit]
+Description=ContextCore off-site backup push
+
+[Service]
+Type=oneshot
+User=contextcore
+ExecStart=/opt/contextcore/code/deploy/backup.sh

@@ -1,0 +1,18 @@
+{
+  "name": "contextcore",
+  "version": "1.0.0",
+  "description": "One memory, rules, skills, notes and tasks for all your AI agents, on your own server (an MCP server).",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "init": "node server/init.mjs",
+    "start": "node server/server.mjs",
+    "check": "node server/check.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "isolated-vm": "7.0.1",
+    "zod": "^4.6.7"
+  }
+}

@@ -1,0 +1,9 @@
+# Rights: notes (write the owner's notes), tasks (change the owner's tasks), notices (get notices), system (change About the owner,
+# the shared rules and the skills no other right owns), types (change note types; only with system).
+# Without system: add only your own name, only to notes, tasks or notices, after the owner's yes to that right in this chat with you, the agent.
+# system, types, another agent's name and every removal: only an agent with the system right, after the owner's yes in its chat.
+notes: []
+tasks: []
+notices: []
+types: []
+system: []

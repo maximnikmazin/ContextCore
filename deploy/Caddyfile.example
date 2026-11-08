@@ -1,0 +1,5 @@
+# Add to /etc/caddy/Caddyfile, then: systemctl reload caddy
+# No domain? <server IP with dashes>.sslip.io points to the server, e.g. 203-0-113-7.sslip.io
+your.host.name {
+	reverse_proxy 127.0.0.1:8798
+}

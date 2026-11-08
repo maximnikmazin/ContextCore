@@ -1,0 +1,7 @@
+type: tool
+meaning: An outside tool, app or service the owner may use.
+fields:
+  link:
+    value: link
+    required: false
+    meaning: The tool's own site, when known.

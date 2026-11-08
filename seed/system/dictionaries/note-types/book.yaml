@@ -1,0 +1,11 @@
+type: book
+meaning: An outside book kept as a resource.
+fields:
+  author:
+    value: text
+    required: false
+    meaning: Include only when known.
+  status:
+    value: one of [to read, reading, read]
+    required: false
+    meaning: Include only when the owner says it.

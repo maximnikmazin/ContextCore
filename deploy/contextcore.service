@@ -1,0 +1,21 @@
+[Unit]
+Description=ContextCore MCP server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=contextcore
+Group=contextcore
+WorkingDirectory=/opt/contextcore/code
+Environment=NM_STATE=/opt/contextcore/state
+Environment=PORT=8798
+Environment=HOST=127.0.0.1
+Environment=GIT_BACKUP=1
+ExecStart=/usr/bin/node server/server.mjs
+Restart=always
+RestartSec=3
+MemoryMax=800M
+
+[Install]
+WantedBy=multi-user.target

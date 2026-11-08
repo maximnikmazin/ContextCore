@@ -1,0 +1,11 @@
+type: place
+meaning: A place in the world the owner may go to.
+fields:
+  city:
+    value: text
+    required: false
+    meaning: Include only when known.
+  address:
+    value: text
+    required: false
+    meaning: Include only when known.
