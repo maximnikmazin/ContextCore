@@ -6,8 +6,8 @@ Your agents in Claude, ChatGPT, coding tools and any app with remote MCP servers
 about you, your rules, notes, tasks, projects and skills. Tell one agent something, and every agent knows it.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/problem-dark.svg">
-  <img alt="Today every app keeps its own memory; with ContextCore all apps read and save one memory on your server" src="docs/problem-light.svg" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/one-memory-dark.svg">
+  <img alt="You tell one agent in ChatGPT to remember that you moved to Berlin; later a planner in Claude and a new tutor agent already know it" src="docs/one-memory-light.svg" width="100%">
 </picture>
 
 ## The problem
@@ -28,42 +28,47 @@ it has the same rules, memory and records.
 
 ## How it works
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/turn-dark.svg">
-  <img alt="One chat: you write, the agent calls start and gets its rules and memory, run reads and saves, the change becomes a git version" src="docs/turn-light.svg" width="100%">
-</picture>
-
-- **Three tools.** `start` gives the agent its rules, the facts about you, its memory, its rights and the time.
-  `run` takes a short program (`nm.read / list / find / write / save_task`) that does all reading and saving in one
-  step, in a sandbox with no network or files. `whats_new` shows what other agents changed.
-- **Plain files.** Everything is Markdown and YAML in a git repo on your server. Every change is a version; you can
-  read, move or back up your memory without ContextCore.
-- **The agent decides, the server guards.** Rules tell agents what goes where. The server checks rights and
-  formats, and a refused save is never half-done.
-
-## What is inside
+**At the start of every chat** the agent calls `start` and reads its job, the facts about you, the shared rules,
+its rights, its own memory, your projects and the time. No app memory is needed, so the same agent works the same
+in any app.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/inside-dark.svg">
-  <img alt="Three spaces with different weight: your notes, agents' records, projects; and the rules every agent reads at start" src="docs/inside-light.svg" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/at-start-dark.svg">
+  <img alt="What an agent reads at the start of every chat: its rules, About you, shared rules, its rights, its memory, your projects and the time" src="docs/at-start-light.svg" width="100%">
 </picture>
 
-Three spaces, and an agent always knows which one a thing came from. Your own notes weigh most. An agent's memory
-and logs are useful, but never your words. Project material counts only for its project. Around them sit the rules
-every agent reads at start: about you, the shared rules, the agent's own rules, skills for each kind of work, and
-rights (which agents may write notes, tasks or rules).
+**As it works**, the agent splits what you say by meaning and puts each part where it belongs: work goes to your
+task list, a fact to your notes or to About you, a rule to the rules of that kind of work. Rules that every agent
+follows wait for your yes; everything else is saved at once.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/routing-dark.svg">
+  <img alt="One message becomes a task, a note about Anna, and a proposed task rule that waits for your yes" src="docs/routing-light.svg" width="100%">
+</picture>
+
+Under the hood there are three tools. `start` gives the agent its rules and memory. `run` takes a short program
+(`nm.read / list / find / write / save_task`) that reads and saves in one step, in a sandbox with no network or
+files. `whats_new` shows what other agents changed. The server checks rights and formats; a refused save is never
+half-done. Everything is Markdown and YAML in a git repo on your server, and every change is a version.
+
+## Not everything weighs the same
+
+Your own notes weigh most. An agent's memory and logs are useful, but never your words, and every search result
+says which one it is. Project material counts only for its project. So an agent never passes its own guess off as
+something you said.
 
 ## It stays tidy
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/tidy-dark.svg">
-  <img alt="Agents save freely; a review agent reads what changed and proposes one short list; nothing changes before you say yes" src="docs/tidy-light.svg" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/review-dark.svg">
+  <img alt="During the day agents save at once; at 21:00 the system agent reviews what changed today and sends one list; nothing changes before you say yes" src="docs/review-light.svg" width="100%">
 </picture>
 
-Agents don't need to be careful about what they save. One agent with the system right runs reviews: daily for what
-agents put in memory (duplicates, outdated facts, a fact several agents need), weekly for agents' files and project
-cards, and weekly for the notes (links, hub notes for big topics, duplicates, new note types). You get one short
-list and answer once. History, like your past plans or lessons, is never removed.
+Nobody checks your requests one by one: agents save at once, as you talk. Once a day, your system agent runs a
+review of what changed since the last one and sends you one short list: a fact that is now in two places, a rule
+saved as a fact, a fact past its date. You answer once. Weekly reviews do the same for agents' files, project cards
+and your notes (links, hub pages for big topics, duplicates). Nothing changes before your yes, and history, like
+past plans or lessons, is never removed.
 
 ## How it differs from other approaches
 
