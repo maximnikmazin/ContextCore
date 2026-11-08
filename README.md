@@ -2,75 +2,51 @@
 
 **One memory for all your AI agents, on your own server.**
 
-Your agents in Claude, ChatGPT, coding tools and any app with remote MCP servers read and write one place: facts
-about you, your rules, notes, tasks, projects and skills. Tell one agent something, and every agent knows it.
+![Tell one agent, and another agent in another app already knows; the same planner continues in a different app](docs/demo.gif)
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/one-memory-dark.svg">
-  <img alt="You tell one agent in ChatGPT to remember that you moved to Berlin; later a planner in Claude and a new tutor agent already know it" src="docs/one-memory-light.svg" width="100%">
-</picture>
+ContextCore is an open-source MCP server for Claude, ChatGPT, coding agents and any other app that supports remote
+MCP servers.
 
-## The problem
+## Stop explaining yourself again
 
-You now work with several AI agents: a chat app on the phone, another one on the laptop, a coding agent, a bot
-for your language lessons. Each one keeps its own memory, so:
+Tell one agent that your project launches Friday. Ask another agent, in another app, when it launches: it already
+knows. Facts about you, notes, tasks, projects and skills live in one place that every agent reads.
 
-- **You repeat yourself.** Your timezone, your projects, how you like answers: told again in every app.
-- **Rules drift apart.** You correct one agent; the others keep the old way.
-- **Memory turns into a pile.** Apps save whatever looks useful. Nobody merges, dates or removes it, and after a
-  few months an agent quotes a fact that stopped being true.
-- **An agent's guess looks like your words.** A note you wrote and a line a bot made up come back with the same
-  weight.
-- **You can't move.** Switch apps, and your agent starts from zero.
+## Your agent goes with you
 
-ContextCore is the one place behind all of them. An agent is a name, not an app: start "planner" in any app, and
-it has the same rules, memory and records.
+An agent is a name, not an app. Start "planner" in any connected app, and it has the same rules and the same
+memory of what it was doing. Shared rules apply to every agent; each agent also keeps its own.
+
+## Memory that stays in order
+
+Agents save as you talk. Once a day, your main agent sends you one short list: a fact saved twice, a rule saved as
+a fact, a fact past its date. Nothing changes before your yes. Everything is plain Markdown and YAML in git on your
+server, every change is a version, and your own words never get mixed up with an agent's guesses.
+
+## Install
+
+Give an AI agent that can use a terminal and SSH (for example Claude Code) this repo's link and say:
+
+> Install ContextCore on my server. Follow INSTALL.md.
+
+The agent installs and checks the server, helps you connect your apps, and moves in what you already have: each
+app's memory, your notes and your projects. You need a Linux server; the daily review needs an app that can run
+scheduled tasks.
 
 ## How it works
-
-**At the start of every chat** the agent calls `start` and reads its job, the facts about you, the shared rules,
-its rights, its own memory, your projects and the time. No app memory is needed, so the same agent works the same
-in any app.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/at-start-dark.svg">
   <img alt="What an agent reads at the start of every chat: its rules, About you, shared rules, its rights, its memory, your projects and the time" src="docs/at-start-light.svg" width="100%">
 </picture>
 
-**As it works**, the agent splits what you say by meaning and puts each part where it belongs: work goes to your
-task list, a fact to your notes or to About you, a rule to the rules of that kind of work. Rules that every agent
-follows wait for your yes; everything else is saved at once.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/routing-dark.svg">
-  <img alt="One message becomes a task, a note about Anna, and a proposed task rule that waits for your yes" src="docs/routing-light.svg" width="100%">
-</picture>
-
-Under the hood there are three tools. `start` gives the agent its rules and memory. `run` takes a short program
+At the start of every chat the agent calls `start` and reads its job, the facts about you, the shared rules, its
+rights, its own memory, your projects and the time. Then `run` takes a short program
 (`nm.read / list / find / write / save_task`) that reads and saves in one step, in a sandbox with no network or
-files. `whats_new` shows what other agents changed. The server checks rights and formats; a refused save is never
-half-done. Everything is Markdown and YAML in a git repo on your server, and every change is a version.
+files; `whats_new` shows what other agents changed. The server checks rights and formats, and a refused save is
+never half-done. Your own notes weigh most; an agent's memory and logs are marked as the agent's.
 
-## Not everything weighs the same
-
-Your own notes weigh most. An agent's memory and logs are useful, but never your words, and every search result
-says which one it is. Project material counts only for its project. So an agent never passes its own guess off as
-something you said.
-
-## It stays tidy
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/review-dark.svg">
-  <img alt="During the day agents save at once; at 21:00 the system agent reviews what changed today and sends one list; nothing changes before you say yes" src="docs/review-light.svg" width="100%">
-</picture>
-
-Nobody checks your requests one by one: agents save at once, as you talk. Once a day, your system agent runs a
-review of what changed since the last one and sends you one short list: a fact that is now in two places, a rule
-saved as a fact, a fact past its date. You answer once. Weekly reviews do the same for agents' files, project cards
-and your notes (links, hub pages for big topics, duplicates). Nothing changes before your yes, and history, like
-past plans or lessons, is never removed.
-
-## How it differs from other approaches
+## How it differs
 
 **Built-in app memory** (the memory of a chat app). Easy, and it works inside one app. It stays there: other apps
 can't read it, you can't see or fix it as a whole, and nothing cleans it. ContextCore moves each app's memory in
@@ -93,23 +69,13 @@ dates and sources on facts, and a review that keeps it in order.
 **ContextCore** is for a person who works with several agents across apps and wants one memory that they own, can
 read, and that doesn't rot. It is not a team knowledge base and not a vector search engine.
 
-## Install
-
-Give your AI agent (one that can use a terminal and SSH, for example Claude Code) the link to this repo and say:
-
-> Install ContextCore for me on my server. Follow INSTALL.md.
-
-The agent asks you a few things (your server, an address, a name for your main agent), installs and checks the
-server, connects your apps, and then helps you move in what you already have: each app's memory, your notes and
-your projects.
-
 ## What is in this repo
 
 - `server/`: the MCP server (three tools: start, whats_new, run) and a read-only page for your phone.
 - `core/`: the rules engine: rights, formats, search, and the tool texts agents see.
 - `seed/`: the starting store: shared rules, note types, task values and the skills the memory works by.
 - `deploy/`: systemd and Caddy templates, an optional off-site backup.
-- `docs/`: the diagrams above.
+- `docs/`: the video and the diagram above.
 - `INSTALL.md`: the install guide, written for the agent.
 
 License: MIT.
