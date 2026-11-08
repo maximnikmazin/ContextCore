@@ -4,6 +4,8 @@
 
 ![Your life and work in one knowledge base; one AI chat saves a place, another app and a coding agent use it; plain .md files open in Obsidian](docs/demo.gif)
 
+[Watch the video in full quality (MP4, 48 s)](docs/demo.mp4)
+
 ContextCore is an open-source MCP server for Claude, ChatGPT, coding agents and any other app that supports remote
 MCP servers.
 
