@@ -2,9 +2,7 @@
 
 **One knowledge base of your life and work, for all your AI agents, on your own server.**
 
-![Your life and work in one knowledge base; one AI chat saves a place, another app and a coding agent use it; plain .md files open in Obsidian](docs/demo.gif)
-
-[Watch the video in full quality (MP4, 48 s)](docs/demo.mp4)
+https://github.com/user-attachments/assets/98e4dc61-4d12-4b7e-8ceb-7f40a4e389f4
 
 ContextCore is an open-source MCP server for Claude, ChatGPT, coding agents and any other app that supports remote
 MCP servers.
@@ -84,7 +82,7 @@ read, and that doesn't rot. It is not a team knowledge base and not a vector sea
 - `core/`: the rules engine: rights, formats, search, and the tool texts agents see.
 - `seed/`: the starting store: shared rules, note types, task values and the skills the memory works by.
 - `deploy/`: systemd and Caddy templates, an optional off-site backup.
-- `docs/`: the video and the diagram above.
+- `docs/`: the video (MP4 and GIF) and the diagram above.
 - `INSTALL.md`: the install guide, written for the agent.
 
 License: MIT.
