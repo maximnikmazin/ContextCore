@@ -62,7 +62,11 @@ cp deploy/backup.service deploy/backup.timer /etc/systemd/system/ && systemctl d
 Give the full link privately and say: it is a password. Anyone who has it can read and change everything. Never
 put it in a public place. A new token: stop the service, write a new random hex string to `state/token`, start it.
 
-The owner's read-only page for phones (tasks and notes): `https://<host>/r/<the key in state/reader-token>`.
+Give the owner the web page too: `https://<host>/r/<the key in state/reader-token>` (the key is made at the first
+start). It shows the whole store read only: notes, tasks, projects, each agent's rules and memory, and system files,
+with search. Opening the link once sets a cookie, so afterwards `https://<host>/v/` works on that device; on a phone
+it can be added to the home screen. It only reads; the key is not the MCP token. A new key: stop the service, delete
+`state/reader-token`, start it.
 
 ## 6. Connect the owner's apps
 
@@ -103,6 +107,25 @@ Ask the owner, in one message, what every agent should know:
 - Notes and knowledge kept elsewhere (a notes folder or vault, a notes app export, another memory server,
   documents): the skill contextcore-move-1-memory. The owner sees one short list before anything is written.
 - Projects: each project the owner works on gets a card (contextcore-projects-1-new), so agents know it.
+
+## 10. Obsidian (optional)
+
+The notes are Markdown with YAML front matter and [[wiki links]], so the whole store opens as an Obsidian vault.
+Obsidian reads a copy on the owner's laptop; the server stays the place where agents write.
+
+1. Get a copy on the laptop:
+   - with the backup from step 4: `git clone git@github.com:<account>/<backup repo>.git ~/ContextCore` (the owner's
+     own GitHub access, not the server's deploy key);
+   - without it: on the server run `git config --global --add safe.directory /opt/contextcore/state` as root once,
+     then on the laptop `git clone root@<server>:/opt/contextcore/state ~/ContextCore`.
+2. Obsidian → Open folder as vault → `~/ContextCore`. Notes are in `brain/`, the facts about the owner in `user.md`,
+   the shared rules in `agents.md`, each agent in `agents/<name>/`, project cards in `projects/`.
+3. To keep it current, install the community plugin "Git" in Obsidian and set an auto pull interval (for example
+   10 minutes). Turn its automatic commit and push off.
+4. Keep Obsidian's own settings out of git: add `.obsidian/` to `~/ContextCore/.git/info/exclude`.
+
+Treat the copy as read only. A change made in Obsidian does not reach the server and blocks the next pull; to change
+something, ask an agent. If a pull is blocked, `git checkout -- . && git pull` in that folder brings the copy back.
 
 ## Updating
 

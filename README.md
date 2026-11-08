@@ -18,11 +18,17 @@ linked to its topic.
 Ask another agent in another app, or a coding agent in your terminal, and it finds what you saved and combines it.
 An agent is a name, not an app: start "planner" anywhere, and it has the same rules and memory.
 
-## Plain .md files you own
+## See it all, on the web or in Obsidian
 
-It all lives on your own server as Markdown files with front matter and [[wiki links]], in git. Clone the backup and
-open the folder in Obsidian or any Markdown editor: notes, links and the graph are all there. Agents save as you
-talk; your main agent proposes tidy-ups (duplicates, missing links, hub pages) and changes nothing before your yes.
+Everything lives on your own server as plain Markdown files with front matter and [[wiki links]], in git.
+
+- **On the web.** Your server has a private read-only page: notes, tasks, projects, and each agent's rules and
+  memory, with search. It works on the phone and can be added to the home screen.
+- **In Obsidian.** Clone the private git backup to your laptop and open the folder as a vault: notes, links and the
+  graph are all there, and a git plugin keeps it up to date. The steps are in INSTALL.md, section 10.
+
+Agents save as you talk; your main agent proposes tidy-ups (duplicates, missing links, hub pages) and changes
+nothing before your yes.
 
 ## Install
 
