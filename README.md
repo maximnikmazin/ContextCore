@@ -1,27 +1,28 @@
 # ContextCore
 
-**One memory for all your AI agents, on your own server.**
+**One knowledge base of your life and work, for all your AI agents, on your own server.**
 
-![Tell one agent, and another agent in another app already knows; the same planner continues in a different app](docs/demo.gif)
+![Your life and work in one knowledge base; one AI chat saves a place, another app and a coding agent use it; plain .md files open in Obsidian](docs/demo.gif)
 
 ContextCore is an open-source MCP server for Claude, ChatGPT, coding agents and any other app that supports remote
 MCP servers.
 
-## Stop explaining yourself again
+## A knowledge base of your whole life and work
 
-Tell one agent that your project launches Friday. Ask another agent, in another app, when it launches: it already
-knows. Facts about you, notes, tasks, projects and skills live in one place that every agent reads.
+Everything that matters to you: projects, people, places, books, health, ideas, research, decisions, and the facts
+every agent should know about you. Tell any agent something worth keeping, and it becomes a note in the right place,
+linked to its topic.
 
-## Your agent goes with you
+## Every agent, in every app, uses it
 
-An agent is a name, not an app. Start "planner" in any connected app, and it has the same rules and the same
-memory of what it was doing. Shared rules apply to every agent; each agent also keeps its own.
+Ask another agent in another app, or a coding agent in your terminal, and it finds what you saved and combines it.
+An agent is a name, not an app: start "planner" anywhere, and it has the same rules and memory.
 
-## Memory that stays in order
+## Plain .md files you own
 
-Agents save as you talk. Once a day, your main agent sends you one short list: a fact saved twice, a rule saved as
-a fact, a fact past its date. Nothing changes before your yes. Everything is plain Markdown and YAML in git on your
-server, every change is a version, and your own words never get mixed up with an agent's guesses.
+It all lives on your own server as Markdown files with front matter and [[wiki links]], in git. Clone the backup and
+open the folder in Obsidian or any Markdown editor: notes, links and the graph are all there. Agents save as you
+talk; your main agent proposes tidy-ups (duplicates, missing links, hub pages) and changes nothing before your yes.
 
 ## Install
 
