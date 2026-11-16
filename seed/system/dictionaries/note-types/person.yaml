@@ -1,0 +1,7 @@
+type: person
+meaning: context about someone
+fields:
+  category:
+    value: text
+    required: true
+    meaning: One or more of family, close, colleagues, clients, followed; several may apply.

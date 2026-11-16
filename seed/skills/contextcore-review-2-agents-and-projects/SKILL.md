@@ -1,6 +1,6 @@
 ---
-description: "Weekly review, for an agent with the system right: sort each agent's data files by how their value changes with time, check project cards, and check that every app routine has its routine skill; propose every change for the owner's yes."
-use_cases: ["Find files an agent no longer needs","Fold old outside material into short summaries","Check project cards for missing or outdated fields","Check that app routines match their routine skills"]
+description: "Weekly review, for an agent with the system right: sort each agent's data files by how their value changes with time, check project cards, check that every app routine has its routine skill, and propose person notes for new names in recent notes; propose every change for the owner's yes."
+use_cases: ["Find files an agent no longer needs","Fold old outside material into short summaries","Check project cards for missing or outdated fields","Check that app routines match their routine skills","Propose person notes for new names in recent notes"]
 triggers: ["уборка файлов агентов","почисти файлы агентов","проверь карточки проектов","проверь рутины ботов","weekly cleanup of agent files","check project cards","check bot routines"]
 tags: ["contextcore","review","routine","cleanup","files","projects"]
 not_for: ["facts and rules in agents' memory → use contextcore-review-1-memory","brain notes → use contextcore-review-3-brain"]
@@ -9,16 +9,17 @@ type: routine
 schedule: every Saturday 20:00 (the owner's timezone)
 created: 2026-11-08T12:00:00.000Z
 by: owner
+updated: 2026-11-16T12:10:46.302Z
 ---
 
 # contextcore-review-2-agents-and-projects
 
-Weekly review of agents' files, project cards and routines
+Weekly review of agents' files, project cards, routines, and new people in notes
 When: your app runs this routine, or the owner asks for it. Only an agent with the system right runs it.
 
 Do: keep your record in data/weekly-review.md: the as_of of your last run, and the file groups (below) with the
 kind and the freshness the owner confirmed for each. Call whats_new with that as_of: it shows what changed in
-every agent's folder and in the project cards; no record yet → look at every agent once. Three parts, one list for the owner at the end.
+every agent's folder and in the project cards; no record yet → look at every agent once. Four parts, one list for the owner at the end.
 
 1. Agents' data files. Agents save files as they find handy; you check them, they don't need to know these rules.
    Put files of one agent that hold the same kind of thing into a group. A group is named by what its files
@@ -50,9 +51,15 @@ every agent's folder and in the project cards; no record yet → look at every a
    times match, and every active routine skill runs in the app. Paused routines, drafts and finished one-time
    routines are not drift. Drift → propose the fix; after the owner's yes, ask that same bot to fix its own;
    never change another bot's routine yourself. A bot that does not answer is "no answer", never "all fine".
+4. People in recent notes. Look at the owner's notes written or updated since the last run (use the date in a
+   title or in the note when a change feed is not available). Collect names that are clearly a person, not a
+   company or a fictional character. Compare them with the People index and existing person notes. For each
+   name that has no person note, propose one: the name, any English aliases already in the notes, the category
+   if the notes say it, and the note you found them in. Do not invent a name or a category, and do not create
+   the note before the owner's yes. This step does not replace the Sunday brain review.
 
 Then show the owner one numbered list, each line: what you found → what you propose, and ask one question.
-Change nothing before the owner's yes: removing, folding, a card change and a routine fix each wait for it.
+Change nothing before the owner's yes: removing, folding, a card change, a routine fix and a new person note each wait for it.
 After the yes, the agent that owns the file or routine, or has the right for that place, makes the change; you check it, then write the new as_of
 and the groups to your record. Note each line the owner said no to; propose it again only when it changes.
 Nothing to propose → write the new as_of all the same; in a routine say nothing, when asked say so in a line.

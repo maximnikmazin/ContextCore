@@ -62,6 +62,13 @@ const MSG = {
   nextAction: "Now do what the owner asked; connecting is not the answer.",
   tasksNotCovered: "This does not cover the owner's tasks: list them again before showing them.",
   searchDownSkills: "Search is down: this is the full skill list instead of search results.",
+  summaryCheck: "The text changed and the note has a summary: check it still fits; rewrite it in the same way, or remove it with {summary: null}.",
+  nothingClose: "No note is close to this question. Try other words for the thing itself (English first, then the owner's words); if still nothing, tell the owner there is no such note.",
+  nothingCloseWordsOnly: 'Nothing matched by words, and search by meaning is down right now, so this is not a sure "nothing found". Try other words, or nm.list the place.',
+  searchWordsOnly: "Search by meaning is down right now: these are word matches only.",
+  moreSure: (n, next) => `${n} more notes also match surely. For everything on this, take them: nm.find({query: <the same query>, cursor: "${next}"}).`,
+  moreWords: (n, next) => `${n} more word matches: nm.find({query: <the same query>, cursor: "${next}"}).`,
+  weakOnly: "Weak matches only, but one of them may still be the answer: read them before you answer. Only if none answers it, tell the owner nothing sure was found.",
   staleFix: "use these changes",
   inRepo: (id, p) => [`This place of ${p.name || id} is not on this server; only README.md, STATUS.md, CRITERIA.md, tasks/ and context/ are.`, `Places on this server: allowed (below). Everything else of ${p.name || id} is in its repo (${p.repo || "no repo on its card"}).`],
   untoldFix: "shown to you, not marked told yet",
@@ -116,7 +123,7 @@ function listBrain(view) {
     if (!p.startsWith("brain/")) continue;
     const f = view.file(p);
     if (f.meta.archived) continue;
-    out.push(it(p, f.meta.title || p, [f.meta.type, f.meta.stage, f.meta.checked === false && "not checked", f.meta.unused && "unused"].filter(Boolean).join(", "), { version: view.version(p) }));
+    out.push(it(p, f.meta.title || p, [f.meta.type, f.meta.origin].filter(Boolean).join(", "), { version: view.version(p) }));
   }
   return out;
 }

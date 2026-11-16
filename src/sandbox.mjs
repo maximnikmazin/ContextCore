@@ -29,10 +29,10 @@ async function run(code, api, limits = {}) {
   }, wallMs);
   try {
     const context = await isolate.createContext();
-    const host = new ivm.Reference((name, argsJson) => {
+    const host = new ivm.Reference(async (name, argsJson) => {
       if (!NM_FUNCTIONS.includes(name)) return JSON.stringify({ err: { code: "PROGRAM_ERROR", message: `nm.${name} does not exist.` } });
       try {
-        const r2 = api[name](...JSON.parse(argsJson));
+        const r2 = await api[name](...JSON.parse(argsJson));
         return JSON.stringify({ ok: r2 === void 0 ? null : r2 });
       } catch (e) {
         return JSON.stringify({ err: e });
@@ -40,7 +40,7 @@ async function run(code, api, limits = {}) {
     });
     await context.global.set("__host__", host);
     await context.eval(`globalThis.nm = ((host) => {
-        const call = (n, a) => { const r = JSON.parse(host.applySync(undefined, [n, JSON.stringify(a)])); if ('err' in r) throw r.err; return r.ok; };
+        const call = (n, a) => { const r = JSON.parse(host.applySyncPromise(undefined, [n, JSON.stringify(a)])); if ('err' in r) throw r.err; return r.ok; };
         return Object.freeze(Object.fromEntries(${JSON.stringify(NM_FUNCTIONS)}.map((n) => [n, async (...a) => call(n, a)])));
       })(__host__);
       delete globalThis.__host__;`);

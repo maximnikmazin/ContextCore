@@ -11,8 +11,15 @@ const CONFIG = {
   EXISTS_ON_TEXT_WITHOUT_VERSION: true,
   OP_CACHE_MINUTES: 15
 };
-const ORIGINS = ["you", "source", "agent", "mixed"];
-const STAGES = ["raw", "processed"];
+const ORIGINS = ["owner", "agent", "saved"];
+const OLD_ORIGINS = { you: "owner", source: "saved", mixed: "owner, agent or saved (by what the note keeps)" };
+const REMOVED_META = {
+  checked: 'checked was removed (16.11). Where it matters, write "not opened, from the title" next to that item in the text.',
+  stage: "stage was removed (16.11). Write the owner's confirmation next to what was confirmed, with its date."
+};
+const SUMMARY_MAX = 600;
+const NAMES_MAX = 10;
+const NAME_MAX = 80;
 const VECTORS = {
   endeavor: "the owner's main work for income",
   maintenance: "keeping life running: documents, bills, repairs",
@@ -28,7 +35,7 @@ const LEVELS_OVER = 7;
 const normTitle = (t) => String(t || "").toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/).filter((w) => w && !["a", "an", "the", "my"].includes(w)).join(" ");
 const topCount = (list) => new Set(list.map((t) => t.day ? `r:${normTitle(t.title)}` : `id:${t.id}`)).size;
 const SKILL_PATH_FIX = 'Write "skills/<name>/SKILL.md" with meta.description.';
-const BRAIN_META = ["title", "type", "origin", "source", "checked", "original", "stage", "archived", "project"];
+const BRAIN_META = ["title", "type", "origin", "source", "original", "summary", "other_names", "archived", "project"];
 const SERVER_META = ["unused", "created", "by", "updated", "last_hit", "archived_at", "told_at", "installed"];
 const PROJECT_ROOT_FILES = ["README.md", "STATUS.md", "CRITERIA.md"];
 const PROJECT_PLACES = [...PROJECT_ROOT_FILES, "tasks/<YYMMDD-name>/task.md", "context/<folder>/<file>.md"];
@@ -206,14 +213,6 @@ function mergeMeta(oldMeta, changeMeta, path) {
   }
   return meta;
 }
-function processedOrigin(changeMeta, meta, path) {
-  if (!changeMeta || changeMeta.stage !== "processed") return;
-  if ("origin" in changeMeta) {
-    if (!["mixed", "you"].includes(changeMeta.origin)) throw refuse("UNKNOWN_VALUE", `origin ${JSON.stringify(changeMeta.origin)} can't go with stage processed.`, `A processed note has origin "mixed", or "you" if it is now fully the owner's words.`, { path, field: "origin", allowed: ["mixed", "you"] });
-    return;
-  }
-  if (meta.origin === "source" || meta.origin === "agent") meta.origin = "mixed";
-}
 function preCheck(c) {
   const { view, agent, cls } = c;
   switch (cls.area) {
@@ -280,13 +279,18 @@ function checkWrite(c) {
 function value(field, v, allowed, path, fix) {
   if (!allowed.includes(v)) throw refuse("UNKNOWN_VALUE", `${field} ${JSON.stringify(v)} is not allowed.`, fix || "Use one of allowed.", { path, field, allowed });
 }
-function checkBrain({ view, agent, path, next, changeMeta, isCreate }) {
+const ORIGIN_HELP = `origin = what the note keeps: "owner" (the owner's thoughts, decisions, plans, life; also your retelling of the owner's words) · "agent" (your own analysis or comparison for the owner, with a conclusion) · "saved" (outside material kept for later: a post, video, message, article, or your summary of it).`;
+const SUMMARY_HELP = "summary: what exactly the note contains (the specific method, decision or result, with names), then, if the note says it, which question it answers. English, one paragraph, no links.";
+const NAMES_HELP = 'other_names: other names of what the note is mainly about (another alphabet, a short form, an old name), e.g. ["München", "Munich"]. Not topics, not people the note only mentions.';
+function checkBrain({ view, agent, path, next, changeMeta, isCreate, change }) {
   needRight(view, agent, "notes", "write the owner's notes");
   serverFields(changeMeta, path);
   const m = next.meta;
   const tf = typeof m.type === "string" ? view.typeFile(m.type) : null;
   const own = tf ? Object.keys(tf.fields) : [];
   const allowedMeta = [...BRAIN_META, ...own];
+  for (const k of Object.keys(changeMeta || {})) if (REMOVED_META[k] && changeMeta[k] !== null) throw refuse("UNKNOWN_FIELD", `A note has no field "${k}" any more.`, REMOVED_META[k], { path, field: k, allowed: allowedMeta });
+  for (const k of Object.keys(REMOVED_META)) delete m[k];
   for (const k of Object.keys(m)) if (!allowedMeta.includes(k) && !SERVER_META.includes(k)) throw refuse("UNKNOWN_FIELD", `A ${typeof m.type === "string" ? `"${m.type}" ` : ""}note has no field "${k}".`, `Fields: ${allowedMeta.join(", ")}. {${k}: null} removes it.`, { path, field: k, allowed: allowedMeta });
   const missing = ["title", "type", "origin"].filter((k) => !has(m[k]));
   if (missing.length) throw refuse("MISSING_FIELD", `A brain note needs ${missing.join(", ")}.`, `Add meta.${missing.join(", meta.")}.`, { path, field: missing[0] });
@@ -300,17 +304,28 @@ function checkBrain({ view, agent, path, next, changeMeta, isCreate }) {
     }
     if (!fieldValueOk(def.spec, m[f])) throw refuse(def.spec.kind === "date" ? "BAD_DATE" : "UNKNOWN_VALUE", `${f} ${JSON.stringify(m[f])} is not ${def.value}.`, def.spec.kind === "one of" ? "Use one of allowed." : `${f}: ${FIELD_VALUE_HELP[def.spec.kind]}.`, { path, field: f, allowed: def.spec.values });
   }
-  value("origin", m.origin, ORIGINS, path, `"you" = the owner's words · source = from a link, book or person · agent = the agent's conclusion · mixed = the agent's summary of the owner's words or of source material.`);
-  if (has(m.stage)) value("stage", m.stage, STAGES, path);
-  if (m.checked !== void 0 && typeof m.checked !== "boolean") throw refuse("UNKNOWN_VALUE", `checked must be true or false (got ${JSON.stringify(m.checked)}).`, "checked: true only if you, the agent, opened or watched every source; else false.", { path, field: "checked", allowed: [true, false] });
+  if (OLD_ORIGINS[m.origin]) throw refuse("UNKNOWN_VALUE", `origin "${m.origin}" was replaced on 16.11.`, `Use ${OLD_ORIGINS[m.origin]}. ${ORIGIN_HELP}`, { path, field: "origin", allowed: ORIGINS });
+  value("origin", m.origin, ORIGINS, path, ORIGIN_HELP);
+  if (m.type === "saved" && m.origin !== "saved") throw refuse("UNKNOWN_VALUE", 'A note of type "saved" has origin "saved".', 'Set origin: "saved", or pick the type that fits what the note keeps.', { path, field: "origin", allowed: ["saved"] });
+  if (has(m.summary)) {
+    const t = typeof m.summary === "string" ? m.summary.trim() : "";
+    if (!t || t.length > SUMMARY_MAX || /\n/.test(t) || /https?:\/\//.test(t)) throw refuse("UNKNOWN_VALUE", `summary must be one paragraph of plain text, at most ${SUMMARY_MAX} characters, with no links (got ${typeof m.summary === "string" ? m.summary.length + " characters" : typeof m.summary}).`, SUMMARY_HELP, { path, field: "summary" });
+    m.summary = t;
+  }
+  if (has(m.other_names)) {
+    const list = Array.isArray(m.other_names) ? m.other_names.map((x) => typeof x === "string" ? x.trim() : x) : null;
+    const key = (x) => x.toLowerCase().normalize("NFD").replace(/\u0308/g, "");
+    const ok = list && list.length <= NAMES_MAX && list.every((x) => typeof x === "string" && x && x.length <= NAME_MAX && !/\n/.test(x)) && new Set(list.map(key)).size === list.length && !list.some((x) => key(x) === key(String(m.title || "")));
+    if (!ok) throw refuse("UNKNOWN_VALUE", `other_names must be a list of 1–${NAMES_MAX} different names, each at most ${NAME_MAX} characters, none the same as the title.`, NAMES_HELP, { path, field: "other_names" });
+    m.other_names = list;
+  }
   if (m.archived !== void 0 && typeof m.archived !== "boolean") throw refuse("UNKNOWN_VALUE", "archived must be true or false.", "Pass {archived: true} to archive, {archived: false} to bring it back.", { path, field: "archived", allowed: [true, false] });
   if (has(m.project) && !view.projects()[m.project]) throw refuse("UNKNOWN_PROJECT", `There is no project "${m.project}".`, 'Use a project id from list("projects"), or leave project out.', { path, field: "project", allowed: Object.keys(view.projects()) });
-  if (m.origin !== "you") {
-    const miss = !has(m.source) ? "source" : typeof m.checked !== "boolean" ? "checked" : null;
-    if (miss) throw refuse("NEEDS_SOURCE", `origin "${m.origin}" needs source and checked (missing: ${miss}).`, 'Add source (links or "chat DD.MM") and checked (true or false).', { path, field: miss });
-  }
+  if (m.origin === "saved" && !has(m.source)) throw refuse("NEEDS_SOURCE", "A saved note needs source: the link back to the post, video, article or chat.", 'Add source: ["https://…"] or ["chat DD.MM"].', { path, field: "source" });
   if (!next.text.trim()) throw refuse("EMPTY_TEXT", "A note can't have empty text.", "Archive instead: {meta: {archived: true}}.", { path, field: "text" });
-  return { setMeta: isCreate ? { stage: "raw" } : {}, suggestType: known ? null : m.type };
+  const hints = [];
+  if (has(m.summary) && !isCreate && change && (change.text !== void 0 || change.replace !== void 0 || change.append !== void 0) && !(changeMeta && "summary" in changeMeta)) hints.push(MSG.summaryCheck);
+  return { setMeta: {}, suggestType: known ? null : m.type, hints };
 }
 const TYPE_FILE_FORMAT = "type: <name>\nmeaning: <one line>\nfields:\n  <field>:\n    value: text | link | date | one of [a, b, …]\n    required: true | false\n    meaning: <one line, optional>";
 const FIELD_VALUE_HELP = { text: "text", link: "a link (https://… or site.com/…)", date: "a date YYYY-MM-DD" };
@@ -675,17 +690,21 @@ export {
   LAYER_ORDER,
   LAYER_SKILLS,
   LEVELS_OVER,
+  NAMES_MAX,
+  NAME_MAX,
   NM_FUNCTIONS,
+  OLD_ORIGINS,
   ORIGINS,
   PROJECT_PLACES,
   PROJECT_ROOT_FILES,
+  REMOVED_META,
   SELF_RIGHTS,
   SERVER_META,
   SHAPE_CODES,
   SHORT_MAX,
   SKILL_PATH_FIX,
   SPACES,
-  STAGES,
+  SUMMARY_MAX,
   TAG_LINE_FORMAT,
   TASK_FIELDS,
   TASK_SERVER_FIELDS,
@@ -717,7 +736,6 @@ export {
   parseTypeFile,
   parseValueSpec,
   preCheck,
-  processedOrigin,
   refuse,
   sameCodeRefused,
   serverFields,

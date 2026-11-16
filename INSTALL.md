@@ -10,7 +10,8 @@ projects and skills, and saves there. Every change is a git version, so nothing 
 
 ## 0. Ask the owner (one message)
 
-- Server: a Linux server you can reach by SSH (Ubuntu or Debian; 1 GB RAM is enough). None → help them rent one.
+- Server: a Linux server you can reach by SSH (Ubuntu or Debian; 2 GB RAM; with 1 GB, turn off search by meaning,
+  see step 2). None → help them rent one.
 - Address: a domain or subdomain pointing to the server, or none (then use `<server IP with dashes>.sslip.io`).
 - The first agent's name: the owner's main, system agent (for example "assistant"). It gets every right and
   sets up everything else.
@@ -20,7 +21,7 @@ projects and skills, and saves there. Every change is a git version, so nothing 
 
 As root:
 ```
-apt-get update && apt-get install -y git curl build-essential python3 caddy
+apt-get update && apt-get install -y git curl build-essential cmake python3 caddy
 curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && apt-get install -y nodejs   # Node 24 or newer
 useradd --system --create-home --home-dir /opt/contextcore --shell /usr/sbin/nologin contextcore
 git clone https://github.com/maximnikmazin/ContextCore.git /opt/contextcore/code
@@ -29,13 +30,20 @@ NM_STATE=/opt/contextcore/state node server/init.mjs --first-agent <name>
 chown -R contextcore:contextcore /opt/contextcore
 ```
 `init` prints the MCP path `/<token>/mcp`. The token is also in `/opt/contextcore/state/token`.
-`isolated-vm` builds native code: if `npm install` fails, the build tools above are missing.
+`isolated-vm` and the search model's runtime (`node-llama-cpp`) build native code: if `npm install` or the first
+start fails, the build tools above are missing.
 
 ## 2. Run it
 
 ```
 cp deploy/contextcore.service /etc/systemd/system/ && systemctl daemon-reload && systemctl enable --now contextcore
 ```
+Note search by meaning: on the first start the server downloads a small embedding model (about 330 MB, to
+`/opt/contextcore/.cache/qmd/models`) and makes a vector for every note. A new store has few notes, so this is
+quick; a store with hundreds of moved notes takes hours on a small server without a GPU (about 20 seconds per long
+note on 2 cores). Find works by words meanwhile and says so. Later only changed notes are processed, between
+searches. With 1 GB RAM: add `Environment=SEARCH=0` to the service (find by words only).
+
 HTTPS: add the block from `deploy/Caddyfile.example` to `/etc/caddy/Caddyfile` with the owner's host, then
 `systemctl reload caddy`. Caddy gets the certificate by itself (ports 80 and 443 must be open).
 
@@ -134,6 +142,9 @@ cd /opt/contextcore/code && git pull && npm install --omit=dev && systemctl rest
 ```
 The store (`/opt/contextcore/state`) is never touched by an update. New skills and shared rules in a new version
 of `seed/` are not copied into an existing store: show the owner what changed and add what the owner wants.
+From a version before 16.11.2026: a note's origin is now owner, agent or saved (what the note keeps), and the fields
+checked and stage are gone. Old notes keep their old origin until an agent changes them; the server then asks
+for one of the new values. Add the saved type to `system/dictionaries/note-types.md` (see `seed/`).
 
 ## How it works, in short
 

@@ -14,7 +14,7 @@ by: owner
 Where types live
 - system/dictionaries/note-types.md: the type list, one line per type: "<name> — <meaning>". Writers get it.
 - system/dictionaries/note-types/<type>.yaml: the own fields of a type that needs them. Common fields (title,
-  type, origin, source, checked, original, stage, archived, project) are never in it. Format:
+  type, origin, source, original, summary, other_names, archived, project) are never in it. Format:
     type: <name>
     meaning: <one line>
     fields:
@@ -31,7 +31,7 @@ or needs its own fields. Never one type per topic, source or wording. Give it a 
 next to it. Keep fields optional unless a note can't be found or used without them.
 
 The process
-1. Look at real notes: the suggestions file and its notes, and the reference notes (the catch-all), with find.
+1. Look at real notes: the suggestions file and its notes, and the saved notes (the catch-all for outside material), with find.
 2. Compare them with the existing types and their files.
 3. Show the owner your analysis in short: the new or changed type, its meaning, its file, and which notes would
    move. One question: create it?

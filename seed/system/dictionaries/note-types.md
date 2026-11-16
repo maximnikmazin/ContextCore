@@ -5,7 +5,7 @@ decision — a choice the owner made, with why
 preference — what the owner likes and how
 owner-data — facts about the owner (an episode from the owner's life, a typology such as MBTI, a trait), and the owner's links, accounts and numbers that serve no project; the note says which kind
 fact — a fact about the world that the owner keeps
-reference — an outside thing or claim to look up later, with no more specific type
+saved — outside material kept for later: a post, video, message or article, or a summary of one
 book — an outside book kept as a resource
 tool — an outside tool, app or service the owner may use
 place — a place in the world the owner may go to

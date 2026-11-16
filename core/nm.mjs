@@ -5,6 +5,12 @@ import { fileURLToPath } from "node:url";
 import { run as sandbox } from "../src/sandbox.mjs";
 import * as C from "./checks.mjs";
 import * as L from "./labels.mjs";
+import { buildIndex as buildWordIndex } from "../src/lexical.mjs";
+import { rank as rankNotes } from "../src/search.mjs";
+let VECTORS = null;
+function setVectorSearch(client) {
+  VECTORS = client;
+}
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const WORLD = path.join(HERE, "world");
 const STATE = process.env.NM_STATE ? path.resolve(process.env.NM_STATE) : path.join(HERE, "state");
@@ -92,9 +98,11 @@ function taskVersion(t) {
 }
 const CYR = { а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "zh", з: "z", и: "i", й: "y", к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f", х: "kh", ц: "ts", ч: "ch", ш: "sh", щ: "shch", ъ: "", ы: "y", ь: "", э: "e", ю: "yu", я: "ya" };
 const slug = (s) => String(s).toLowerCase().replace(/[а-яё]/g, (c) => CYR[c]).normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/[\s_]+/g, "-").replace(/-+/g, "-").slice(0, 50).replace(/-$/, "") || "note";
+const isSaved = (f) => !!f && (f.meta.origin === "saved" || f.meta.type === "saved" || f.meta.type === "hub");
 const publicMeta = (meta) => {
   const m = { ...meta };
   delete m.last_hit;
+  delete m.unused;
   return m;
 };
 function ownerTz(S) {
@@ -401,7 +409,8 @@ function makeApi(S, agent, calls) {
       throw C.refuse("SEARCH_UNAVAILABLE", 'Search is unavailable right now; this is not "nothing found".', "nm.list and nm.read still work.");
     }
     const where = opts.where || {};
-    if (typeof where !== "object" || Array.isArray(where)) throw C.bad('where must be an object of meta fields, e.g. {type: "idea", stage: "raw"}.', 'nm.find({where: {type: "idea"}}).');
+    if (typeof where !== "object" || Array.isArray(where)) throw C.bad('where must be an object of meta fields, e.g. {type: "idea", origin: "owner"}.', 'nm.find({where: {type: "idea"}}).');
+    if (opts.cursor !== void 0 && !String(opts.query || "").trim() && !Object.keys(where).length) throw C.bad("A cursor continues a search: send it with the same query (or the same where).", 'nm.find({query: "<the same query>", cursor: "<the cursor>"}).');
     const q = tokens(opts.query || "");
     const matchWhere = (obj) => Object.entries(where).every(([k, want]) => {
       const have = obj[k];
@@ -409,6 +418,8 @@ function makeApi(S, agent, calls) {
       if (Array.isArray(have)) return wants.some((w) => have.includes(w));
       return wants.some((w) => w === have || w === null && have === void 0 || w === false && have === void 0 && k === "archived");
     });
+    const noteSpaces = spaces.filter((s) => s !== "todo" && s !== "skills");
+    if (VECTORS && q.length && noteSpaces.length) return findNotes(opts, spaces, noteSpaces, matchWhere, q);
     const scoreOf = (title, body) => {
       if (!q.length) return 1;
       const tt = new Set(tokens(title));
@@ -435,9 +446,8 @@ function makeApi(S, agent, calls) {
       if (skillRank && space === "skills") continue;
       let s = scoreOf(f.meta.title || p.split("/").pop(), `${p} ${f.text} ${[].concat(f.meta.source || []).join(" ")} ${f.meta.original || ""} ${f.meta.type || ""} ${f.meta.when || ""}`);
       if (!s) continue;
-      if (f.meta.stage === "processed") s *= 1.3;
-      if (f.meta.origin === "you") s *= 1.2;
-      if (f.meta.checked === false) s *= 0.8;
+      if (f.meta.origin === "owner") s *= 1.2;
+      if (f.meta.origin === "saved") s *= 0.8;
       hits.push({ s, hit: { path: p, space, title: f.meta.title || /^projects\/[^/]+\/card\.md$/.test(p) && L.parseCard(f.text).name || /^projects\//.test(p) && L.firstLine(f.text).replace(/^#+\s*/, "") || p, meta: publicMeta(f.meta), snippet: snippet(f.text, q), version: fileVersion(f) } });
     }
     if (spaces.includes("todo")) {
@@ -459,6 +469,71 @@ function makeApi(S, agent, calls) {
     const out = { items, total: hits.length };
     if (start2 + 20 < hits.length) out.cursor = String(start2 + 20);
     return out;
+  }
+  async function findNotes(opts, spaces, noteSpaces, matchWhere, q) {
+    const docs = [];
+    for (const p of view.paths()) {
+      const f = S.files.get(p);
+      const sp = spaceOf(p, f);
+      if (f.meta.archived === true && sp !== "archive" && opts.where?.archived === void 0) continue;
+      if (noteSpaces.includes(sp) && matchWhere(f.meta)) docs.push({ path: p, title: f.meta.title || "", text: f.text || "", summary: f.meta.summary || "", names: [].concat(f.meta.other_names || []) });
+    }
+    const visible = new Set(docs.map((d) => d.path));
+    const words = buildWordIndex(docs).score(opts.query);
+    const vectors = await VECTORS.close(opts.query);
+    const r = rankNotes({ vectors, words, allowed: (p) => visible.has(p), query: opts.query, dateOf: (p) => noteDate(p, S.files.get(p)), savedOf: (p) => isSaved(S.files.get(p)) });
+    const hit = (it) => {
+      const f = S.files.get(it.path);
+      return { path: it.path, space: spaceOf(it.path, f), title: titleOf(it.path, f), meta: publicMeta(f.meta), snippet: chunkSnippet(it.chunk, q) || snippet(f.text, q), version: fileVersion(f), ...it.weak ? { weak: true } : {} };
+    };
+    const from = Number.isInteger(Number(opts.cursor)) && opts.cursor !== void 0 ? Math.max(0, Number(opts.cursor)) : 0;
+    const all = r.items.concat(r.more);
+    const page = from ? all.slice(from, from + 20) : r.items;
+    const items = page.map(hit);
+    for (const h of items) if (h.space === "brain" || h.space === "archive") touch(S, h.path);
+    const next = from ? from + 20 : r.items.length;
+    const left = Math.max(0, all.length - next);
+    const out = { items, total: all.length };
+    if (left) {
+      out.cursor = String(next);
+      out.more = left;
+    }
+    if (from) {
+      if (!vectors) out.note = L.MSG.searchWordsOnly;
+      return out;
+    }
+    const rest = spaces.filter((s) => s === "todo" || s === "skills");
+    if (rest.length) {
+      const o = find({ ...opts, in: rest });
+      out.items = items.concat(o.items);
+      out.total = all.length + o.total;
+    }
+    const notes = [];
+    if (!out.items.length) notes.push(vectors ? L.MSG.nothingClose : L.MSG.nothingCloseWordsOnly);
+    else {
+      if (!vectors) notes.push(L.MSG.searchWordsOnly);
+      if (items.length && items.every((h) => h.weak)) notes.push(L.MSG.weakOnly);
+      else if (left) notes.push(vectors ? L.MSG.moreSure(left, next) : L.MSG.moreWords(left, next));
+    }
+    if (notes.length) out.note = notes.join(" ");
+    return out;
+  }
+  function noteDate(p, f) {
+    const t = `${f.meta.title || ""} ${p}`;
+    let m = t.match(/\b(\d{1,2})[.\/](\d{1,2})[.\/](20\d\d)\b/) || t.match(/\b(\d{1,2})(\d{2})(20\d\d)\b/);
+    if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+    const MONTHS = ["jan|янв", "feb|фев", "mar|мар", "apr|апр", "may|ма[йя]", "jun|июн", "jul|июл", "aug|авг", "sep|сен", "oct|окт", "nov|ноя", "dec|дек"];
+    const my = t.toLowerCase().match(/([a-zа-яё]+)\s*(20\d\d)\b/u);
+    if (my) {
+      const i = MONTHS.findIndex((x) => new RegExp(`^(${x})`, "u").test(my[1]));
+      if (i >= 0) return `${my[2]}-${String(i + 1).padStart(2, "0")}-01`;
+    }
+    m = p.match(/\/(\d\d)(\d\d)(\d\d)-/);
+    if (m) return `20${m[1]}-${m[2]}-${m[3]}`;
+    return String(f.meta.created || "").slice(0, 10);
+  }
+  function titleOf(p, f) {
+    return f.meta.title || /^projects\/[^/]+\/card\.md$/.test(p) && L.parseCard(f.text).name || /^projects\//.test(p) && L.firstLine(f.text).replace(/^#+\s*/, "") || p;
   }
   function write(p, change, version, extra) {
     if (extra !== void 0) {
@@ -501,7 +576,6 @@ function makeApi(S, agent, calls) {
     }
     const meta = C.mergeMeta(existing ? existing.meta : {}, change.meta, p);
     if (cls.area === "skill" && cls.file === "SKILL.md") delete meta.title;
-    if (cls.area === "brain" && existing) C.processedOrigin(change.meta, meta, p);
     const res = C.checkWrite({ view, agent, path: p, cls, existing, next: { text, meta }, change, changeMeta: change.meta, isCreate });
     Object.assign(meta, res.setMeta || {});
     const t = now();
@@ -531,8 +605,8 @@ function makeApi(S, agent, calls) {
     const out = { path: p, version: fileVersion(doc) };
     noteRunVersion(p, out.version);
     if (cls.area === "brain") {
-      out.stage = meta.stage;
       out.origin = meta.origin;
+      if (res.hints && res.hints.length) out.note = res.hints.join(" ");
     }
     return out;
   }
@@ -616,7 +690,6 @@ function makeApi(S, agent, calls) {
     }
     const out = { path: dest, version: fileVersion(S.files.get(dest)) };
     if (relinked.length) out.links_updated = relinked;
-    if (dest.startsWith("brain/")) out.stage = meta.stage;
     return out;
   }
   function save_task(input) {
@@ -729,8 +802,17 @@ function makeApi(S, agent, calls) {
   const wrapped = {};
   for (const [name, fn] of Object.entries(api)) {
     wrapped[name] = (...args) => {
+      const fail = (e) => {
+        const r = C.isRefusal(e) ? e : C.refuse("SERVER_ERROR", String(e?.stack || e), "A bug in the fake server; report it.");
+        calls.push({ fn: name, args, refusal: r });
+        throw r;
+      };
       try {
         const r = fn(...args);
+        if (r && typeof r.then === "function") return r.then((v) => {
+          calls.push({ fn: name, args, result: v });
+          return v;
+        }, fail);
         calls.push({ fn: name, args, result: r });
         return r;
       } catch (e) {
@@ -811,6 +893,18 @@ function skillRanker(S, view, query) {
 const STOP = new Set("a an the and or of to in on for with is are be my me i it this that from at by as do does did what about note notes".split(" "));
 function tokens(s) {
   return String(s).toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 1 && !STOP.has(w)).map((w) => w.length > 4 && w.endsWith("s") && !w.endsWith("ss") ? w.slice(0, -1) : w);
+}
+function chunkSnippet(chunk, q) {
+  const flat = String(chunk || "").replace(/^---[\s\S]*?\n---\s*/, "").replace(/\s+/g, " ").trim();
+  if (!flat) return "";
+  const low = flat.toLowerCase();
+  let i = q.length ? Math.min(...q.map((w) => {
+    const j = low.indexOf(w);
+    return j < 0 ? 1e9 : j;
+  })) : 0;
+  if (i === 1e9) i = 0;
+  const s = Math.max(0, i - 40);
+  return (s ? "…" : "") + flat.slice(s, s + 200) + (flat.length > s + 200 ? "…" : "");
 }
 function snippet(text, q) {
   const flat = text.replace(/\s+/g, " ").trim();
@@ -1210,6 +1304,7 @@ export {
   sectionOf,
   seqKey,
   seqOf,
+  setVectorSearch,
   slug,
   splitSharedRules,
   start,

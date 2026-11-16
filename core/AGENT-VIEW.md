@@ -123,7 +123,7 @@ Count from start's "now".
 
 ## Reading saved material
 
-The owner's notes first; read the full hit before you quote it. Mark what is not the owner's (an agent's note or line, anything unchecked, an archived note). The archive only for history or everything.
+The owner's notes first; read the full hit before you quote it. Mark what is not the owner's (an agent's note or line, saved outside material, an archived note). Search shows the owner's and agents' own notes before saved posts, videos and articles; to look only in those: find with where: {origin: "saved"}. The archive only for history or everything.
 
 ## Replies and failed saves
 
@@ -199,8 +199,8 @@ FUNCTIONS
  nm.read(path) → {path, text, meta, version, linked_from?}
  nm.find({query?, in?, where?, cursor?}) → {items: [{path, title, meta, snippet, version}], total, cursor?}
    in: "brain" (default) | "projects" | "todo" | "agents" | "skills" | "archive" | "all"
-   20 per page; next page: pass the cursor.
- nm.write(path, change, version?) → {path, version, stage?}
+   Notes by meaning: best 5, more via cursor. Else 20 per page.
+ nm.write(path, change, version?) → {path, version, note?}
    New: a new exact path, or a folder ending "/" (named from meta.title); no version.
    change: {text (replaces WHOLE file) | replace: [old, new] | append (new line at end), meta? (merged; null removes key)} | {move_to}
    Existing file: pass the version read.

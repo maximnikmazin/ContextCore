@@ -34,7 +34,7 @@ For each note you look at, find:
 5. A type that does not fit its meaning in note-types.md → propose the right type.
 Types: once a run, look at the type list as a whole, under contextcore-types-1-rules. Ten notes or more of one
 type that are one kind of thing, which the owner would look for by that kind, and the type's meaning is wider
-(the catch-all reference first) → propose a new type: its one-line meaning, its boundary against the types
+(the catch-all saved first) → propose a new type: its one-line meaning, its boundary against the types
 next to it, and the notes that would move. Two types that mean the same in use → propose merging them. Read the
 suggestions file too.
 
