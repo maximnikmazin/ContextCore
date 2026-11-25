@@ -60,6 +60,18 @@ rights, its own memory, your projects and the time. Then `run` takes a short pro
 files; `whats_new` shows what other agents changed. The server checks rights and formats, and a refused save is
 never half-done. Your own notes weigh most; an agent's memory and logs are marked as the agent's.
 
+## Your data is safe
+
+The server is the only one that writes your store, and it does one change at a time. A save writes only what changed:
+first a journal, then each file is replaced whole, so a crash or a power cut never leaves half a store. Files are deleted
+only when an agent or the archive asked for it. If files go missing or change behind the server's back, every agent
+answers "storage failure" instead of working with a smaller store. The off-site backup checks every version before it
+sends it: a version that deletes or empties many files is held back, and you get a notice.
+
+**Installed before 25.11.2026?** Update the code, then run `systemctl disable --now backup.timer` and add
+`Environment=JOBS=1` and `Environment=BACKUP_KEY=/opt/contextcore/.ssh/backup_key` to the service (see
+`deploy/contextcore.service`). The old version could lose files when two agents saved at the same moment.
+
 ## How it differs
 
 **Built-in app memory** (the memory of a chat app). Easy, and it works inside one app. It stays there: other apps
