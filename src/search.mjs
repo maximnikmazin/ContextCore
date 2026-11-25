@@ -149,6 +149,17 @@ async function createVectors({ stateDir, dbPath }) {
     }
     return { same: !!same, had: !!saved, save: () => fs.writeFileSync(fpFile, JSON.stringify({ model: llm.embedModelName, fp })) };
   }
+  function storeLooksWhole() {
+    const now = new Set(listMd(stateDir));
+    let m = null;
+    try {
+      m = JSON.parse(fs.readFileSync(path.join(stateDir, ".manifest.json"), "utf8"));
+    } catch {
+    }
+    if (m && m.files) return Object.keys(m.files).filter((p) => p.endsWith(".md") && (p.startsWith("brain/") || p.startsWith("projects/"))).every((p) => now.has(p));
+    const had = listMd(mirror).length;
+    return !(had > 20 && now.size < had / 2);
+  }
   let modelChecked = null;
   let again = null;
   function refresh() {
@@ -157,10 +168,8 @@ async function createVectors({ stateDir, dbPath }) {
       if (again === run) again = null;
       await searchGap();
       const t = Date.now();
-      const had = listMd(mirror).length;
-      const now = listMd(stateDir).length;
-      if (had > 20 && now < had / 2) {
-        last = { at: (new Date()).toISOString(), error: `the store shows ${now} of ${had} notes; the index is kept as it was` };
+      if (!storeLooksWhole()) {
+        last = { at: (new Date()).toISOString(), error: "the store looks damaged; the index is kept as it was" };
         console.error("search:", last.error);
         return last;
       }
