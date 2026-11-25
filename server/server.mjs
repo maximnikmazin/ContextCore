@@ -259,6 +259,8 @@ async function pushJob() {
   }
 }
 function checkVersion(c) {
+  const parents = git(["rev-list", "--parents", "-n", "1", c]).trim().split(" ").length - 1;
+  if (parents > 1) return "is a merge, which the server never makes";
   const msg = git(["log", "-1", "--format=%B", c]);
   const named = new Set([...msg.matchAll(/^Deleted: (.+)$/gm)].map((m) => m[1]));
   const changes = statusPairs(git(["diff-tree", "--no-commit-id", "-r", "--name-status", "--no-renames", "-z", "--root", c]));
@@ -266,13 +268,22 @@ function checkVersion(c) {
   if (del.length > MAX_PUSH_DELETES) return `deletes ${del.length} files (${del.slice(0, 3).join(", ")}, …)`;
   const unnamed = del.filter((p) => !named.has(p));
   if (unnamed.length) return `deletes ${unnamed.length} files it does not name (${unnamed.slice(0, 3).join(", ")}${unnamed.length > 3 ? ", …" : ""})`;
-  const num = git(["diff-tree", "--no-commit-id", "-r", "--numstat", "--no-renames", "-z", "--root", c]).split("\0").filter(Boolean);
-  let blanked = 0;
-  for (const row of num) {
-    const [a, d] = row.split("	");
-    if (a === "0" && Number(d) >= 3) blanked++;
+  const raw = git(["diff-tree", "--no-commit-id", "-r", "--no-renames", "-z", "--root", c]).split("\0").filter(Boolean);
+  const pairs = [];
+  for (let i = 0; i + 1 < raw.length; i += 2) {
+    const f = raw[i].split(" ");
+    if (f[4] === "M") pairs.push([f[2], f[3]]);
   }
-  if (blanked > MAX_PUSH_DELETES) return `empties ${blanked} files`;
+  if (pairs.length) {
+    const sizes = git(["cat-file", "--batch-check=%(objectsize)"], pairs.flat().join("\n") + "\n").trim().split("\n").map(Number);
+    let blanked = 0;
+    for (let i = 0; i < pairs.length; i++) {
+      const was = sizes[2 * i];
+      const now = sizes[2 * i + 1];
+      if (was > 0 && (now === 0 || was >= 20 && now < was / 10)) blanked++;
+    }
+    if (blanked > MAX_PUSH_DELETES) return `empties ${blanked} files`;
+  }
   return null;
 }
 function openNotice(S, name, text) {
