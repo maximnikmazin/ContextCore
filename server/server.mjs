@@ -3,7 +3,8 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { execFileSync, spawn } from "node:child_process";
+import { execFileSync, execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
@@ -27,31 +28,208 @@ const SERVER_INSTRUCTIONS = "ContextCoreMCP stores the owner's managed instructi
 if (SERVER_INSTRUCTIONS.length >= 2e3) throw new Error("server instructions over 2,000 characters");
 const OP_ID_DESC = "A new program uses start's as_of time with seconds plus a count. If this app assigns you an agent identity and you have not called start in this chat, call start first.";
 const nameOf = (a) => String(a).trim().toLowerCase();
-async function call(tool, args, fn) {
-  const t0 = performance.now();
-  const S = NM.loadState();
-  S.server.now = (new Date()).toISOString();
-  NM.sweep(S);
-  const out = await fn(S);
-  NM.saveState(out.state || S);
-  if (process.env.GIT_BACKUP === "1") commitChange(tool, args);
-  if (search && tool === "run" && /\b(write|save_task)\s*\(/.test(String(args.code || ""))) search.refresh();
-  const ms = Math.round(performance.now() - t0);
-  fs.appendFileSync(CALLS, JSON.stringify({ at: (new Date()).toISOString(), tool, args, ms, result: out.answer }) + "\n");
-  return { content: contentOf(tool, out.answer) };
+let tail = Promise.resolve();
+function serial(fn) {
+  const p = tail.then(fn);
+  tail = p.catch(() => {
+  });
+  return p;
 }
-function commitChange(tool, args) {
+const INCIDENTS = process.env.INCIDENTS || path.join(NM.STATE, "..", "incidents.jsonl");
+function incident(what, detail = {}) {
+  const row = { at: (new Date()).toISOString(), what, ...detail };
+  console.error("STORAGE INCIDENT", JSON.stringify(row));
   try {
-    const git = (...a) => execFileSync("git", ["-C", NM.STATE, ...a], { encoding: "utf8" });
-    if (tool !== "run" || !/\b(write|save_task)\s*\(/.test(String(args.code || ""))) return;
-    const changed = git("status", "--porcelain");
-    if (!changed.trim()) return;
-    git("add", "-A");
+    fs.appendFileSync(INCIDENTS, JSON.stringify(row) + "\n");
+  } catch {
+  }
+}
+function storageFailure(tool, args, e) {
+  incident(e.message, { tool, agent: args.agent, op_id: args.op_id, ...e.detail });
+  const answer = { code: "STORAGE_FAILURE", message: `ContextCoreMCP storage looks damaged: ${e.message} Nothing was read or saved.`, fix: "Tell the owner: ContextCoreMCP storage failure. It is not empty and you deleted nothing; save nothing elsewhere and do not retry.", committed: false };
+  try {
+    fs.appendFileSync(CALLS, JSON.stringify({ at: (new Date()).toISOString(), tool, args, ms: 0, result: answer }) + "\n");
+  } catch {
+  }
+  return { content: [{ type: "text", text: JSON.stringify(answer, null, 1) }] };
+}
+function call(tool, args, fn) {
+  return serial(async () => {
+    const t0 = performance.now();
+    let S;
+    let saved;
+    try {
+      S = NM.loadState();
+    } catch (e) {
+      if (e.code === "STORAGE_FAILURE") return storageFailure(tool, args, e);
+      throw e;
+    }
+    const base = S.disk;
+    S.server.now = (new Date()).toISOString();
+    NM.sweep(S);
+    const out = await fn(S);
+    try {
+      saved = NM.saveState(out.state || S, NM.STATE, base);
+    } catch (e) {
+      if (e.code === "STORAGE_FAILURE") return storageFailure(tool, args, e);
+      throw e;
+    }
+    if (process.env.GIT_BACKUP === "1") commitChange(tool, args, saved);
+    if (search && saved.content.some((p) => p.startsWith("brain/") || p.startsWith("projects/"))) search.refresh();
+    if (saved.content.some((p) => p.startsWith("skills/"))) skillsSoon();
+    const ms = Math.round(performance.now() - t0);
+    fs.appendFileSync(CALLS, JSON.stringify({ at: (new Date()).toISOString(), tool, args, ms, result: out.answer }) + "\n");
+    return { content: contentOf(tool, out.answer) };
+  });
+}
+const git = (args, input) => execFileSync("git", ["-C", NM.STATE, ...args], { encoding: "utf8", input });
+const pending = new Set();
+if (process.env.GIT_BACKUP === "1") {
+  try {
+    for (const l of git(["status", "--porcelain", "--no-renames"]).split("\n")) if (l.trim()) pending.add(l.slice(3).replace(/^"|"$/g, ""));
+  } catch (e) {
+    console.error("git status at start failed:", e.message);
+  }
+}
+function commitChange(tool, args, saved) {
+  for (const p of saved.paths) pending.add(p);
+  if (!saved.content.length) return;
+  try {
+    const paths = [...pending, "requests.jsonl"];
+    const there = paths.filter((p) => fs.existsSync(path.join(NM.STATE, p)));
+    const gone = paths.filter((p) => !fs.existsSync(path.join(NM.STATE, p)));
+    if (there.length) git(["add", "-A", "--pathspec-from-file=-"], there.join("\n") + "\n");
+    if (gone.length) git(["rm", "-q", "--cached", "--ignore-unmatch", "--pathspec-from-file=-"], gone.join("\n") + "\n");
+    const deleted = git(["diff", "--cached", "--name-only", "--diff-filter=D"]).split("\n").filter(Boolean);
+    const allowed = new Set(saved.deletes);
+    const extra = deleted.filter((p) => !allowed.has(p));
+    if (extra.length) {
+      git(["reset", "-q"]);
+      incident(`a version would delete ${extra.length} files the save did not delete; no version made`, { tool, agent: args.agent, op_id: args.op_id, sample: extra.slice(0, 5) });
+      return;
+    }
+    try {
+      git(["diff", "--cached", "--quiet"]);
+      pending.clear();
+      return;
+    } catch {
+    }
     const who = nameOf(args.agent || args.name || "server");
-    git("commit", "-q", "-m", `${tool} by ${who}${args.op_id ? ` (${args.op_id})` : ""}`);
+    git(["commit", "-q", "-m", `${tool} by ${who}${args.op_id ? ` (${args.op_id})` : ""}`]);
+    pending.clear();
   } catch (e) {
     console.error("git version failed:", e.message);
   }
+}
+const sh = promisify(execFile);
+const SKILLS_SYNC = process.env.SKILLS_SYNC;
+let skillsRunning = false;
+let skillsAgain = false;
+let skillsTimer = null;
+function skillsSoon() {
+  if (!SKILLS_SYNC || process.env.JOBS !== "1") return;
+  clearTimeout(skillsTimer);
+  skillsTimer = setTimeout(skillsJob, 2e3);
+}
+async function skillsJob() {
+  if (!SKILLS_SYNC) return;
+  if (skillsRunning) {
+    skillsAgain = true;
+    return;
+  }
+  skillsRunning = true;
+  try {
+    await sh("bash", [SKILLS_SYNC, "fetch"], { timeout: 6e4 });
+    await serial(async () => {
+      try {
+        await sh("bash", [SKILLS_SYNC, "apply"], { timeout: 3e4 });
+      } finally {
+        NM.writeManifest();
+      }
+    });
+    await sh("bash", [SKILLS_SYNC, "push"], { timeout: 6e4 });
+  } catch (e) {
+    console.error("skills sync:", (e.stderr || e.message || "").toString().slice(0, 300));
+  } finally {
+    skillsRunning = false;
+    if (skillsAgain) {
+      skillsAgain = false;
+      setTimeout(skillsJob, 1e3);
+    }
+  }
+}
+const MAX_PUSH_DELETES = 50;
+const BACKUP_KEY = process.env.BACKUP_KEY;
+async function pushJob() {
+  try {
+    git(["remote", "get-url", "origin"]);
+  } catch {
+    return;
+  }
+  try {
+    const head = git(["rev-parse", "HEAD"]).trim();
+    let last = null;
+    try {
+      last = git(["rev-parse", "--verify", "-q", "refs/remotes/origin/main"]).trim();
+    } catch {
+    }
+    if (last === head) return;
+    const deleted = last ? git(["diff", "--name-only", "--diff-filter=D", last, head]).split("\n").filter(Boolean) : [];
+    if (deleted.length > MAX_PUSH_DELETES) {
+      incident(`backup paused: the versions since the last backup delete ${deleted.length} files`, { from: last, to: head, sample: deleted.slice(0, 5) });
+      await notice("backup-paused", `The off-site backup of your ContextCoreMCP data is paused: the versions since the last backup delete ${deleted.length} files at once (${deleted.slice(0, 3).join(", ")}, …). Nothing was sent. If these deletions are right, Claude Code on the Mac resumes the backup; if not, it restores the files from the last backup.`);
+      return;
+    }
+    const env = { ...process.env, ...BACKUP_KEY ? { GIT_SSH_COMMAND: `ssh -i ${BACKUP_KEY} -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new` } : {} };
+    await sh("git", ["-C", NM.STATE, "push", "-q", "origin", `${head}:refs/heads/main`], { timeout: 12e4, env });
+    await closeNotice("backup-push-failed");
+    await closeNotice("backup-paused");
+  } catch (e) {
+    const why = (e.stderr || e.message || "").toString().trim().split("\n").pop().slice(0, 120);
+    console.error("backup push failed:", why);
+    await notice("backup-push-failed", `The off-site backup of your ContextCoreMCP data failed (${why}). Your data is safe on the server; the off-site copy is older.`);
+  }
+}
+function notice(name, text) {
+  return serverChange(`notice ${name}`, (S) => {
+    const p = `system/notices/${name}.md`;
+    const f = S.files.get(p);
+    if (f && f.meta.status === "open") return false;
+    S.files.set(p, { text: `${text}
+`, meta: { status: "open", opened: S.server.now, told: false, created: S.server.now, by: "server" } });
+    S.server.changes.push({ at: S.server.now, path: p, by: "server", what: f ? "changed" : "created" });
+    return true;
+  });
+}
+function closeNotice(name) {
+  return serverChange(`notice closed ${name}`, (S) => {
+    const p = `system/notices/${name}.md`;
+    const f = S.files.get(p);
+    if (!f || f.meta.status !== "open") return false;
+    f.meta.status = "closed";
+    S.server.changes.push({ at: S.server.now, path: p, by: "server", what: "changed" });
+    return true;
+  });
+}
+function serverChange(what, fn) {
+  return serial(async () => {
+    try {
+      const S = NM.loadState();
+      const base = S.disk;
+      S.server.now = (new Date()).toISOString();
+      if (!fn(S)) return;
+      const saved = NM.saveState(S, NM.STATE, base);
+      if (process.env.GIT_BACKUP === "1") commitChange("server", { name: "server", op_id: what }, saved);
+    } catch (e) {
+      incident(`server job could not save (${what}): ${e.message}`);
+    }
+  });
+}
+if (process.env.JOBS === "1") {
+  setInterval(skillsJob, 12e4);
+  setInterval(pushJob, 6e5);
+  setTimeout(skillsJob, 5e3);
+  setTimeout(pushJob, 15e3);
 }
 function contentOf(tool, answer) {
   if (tool === "start" && answer && typeof answer.instructions === "string") {

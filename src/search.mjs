@@ -157,6 +157,13 @@ async function createVectors({ stateDir, dbPath }) {
       if (again === run) again = null;
       await searchGap();
       const t = Date.now();
+      const had = listMd(mirror).length;
+      const now = listMd(stateDir).length;
+      if (had > 20 && now < had / 2) {
+        last = { at: (new Date()).toISOString(), error: `the store shows ${now} of ${had} notes; the index is kept as it was` };
+        console.error("search:", last.error);
+        return last;
+      }
       const model = modelChecked || await checkModel();
       const m = syncMirror();
       dbg("mirror synced", m);

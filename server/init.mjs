@@ -19,8 +19,9 @@ if (!/^[a-z0-9][a-z0-9-]{0,39}$/.test(first)) {
   console.error('Give the first agent a name: --first-agent <name> (lowercase letters, digits, hyphens). It becomes the system agent.');
   process.exit(1);
 }
-if (fs.existsSync(path.join(STATE, '_server.json'))) {
-  console.error(`A store already exists in ${STATE}. Nothing changed.`);
+// only into an empty folder: a store with a missing or damaged file is still a store, never seeded over
+if (fs.existsSync(STATE) && fs.readdirSync(STATE).length) {
+  console.error(`${STATE} is not empty: a store (or part of one) is already there. Nothing changed.`);
   process.exit(1);
 }
 
@@ -40,7 +41,7 @@ fs.writeFileSync(acc, fs.readFileSync(acc, 'utf8').replace(/^(notes|tasks|notice
 
 const token = crypto.randomBytes(16).toString('hex');
 fs.writeFileSync(path.join(STATE, 'token'), token + '\n', { mode: 0o600 });
-fs.writeFileSync(path.join(STATE, '.gitignore'), ['token', 'reader-token', 'calls.jsonl', 'requests.jsonl', '_calls.jsonl', ''].join('\n'));
+fs.writeFileSync(path.join(STATE, '.gitignore'), ['token', 'reader-token', 'calls.jsonl', 'requests.jsonl', '_calls.jsonl', '.journal.json', '.manifest.json', '*.tmp-cc-*', ''].join('\n'));
 
 const git = (...a) => execFileSync('git', ['-C', STATE, ...a], { encoding: 'utf8' });
 git('init', '-q', '-b', 'main');

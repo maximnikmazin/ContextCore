@@ -7,7 +7,7 @@ not_for: ["a piece of work to do → use contextcore-tasks-1-rules","creating or
 requires: ["none"]
 created: 2026-10-25T03:00:00.000Z
 by: owner
-updated: 2026-11-07T13:15:12.756Z
+updated: 2026-11-25T09:18:50.765Z
 ---
 
 # Note rules
@@ -18,6 +18,7 @@ The owner's remark on a note → append it; don't rewrite earlier text.
 A new note → pick a type from the type list (start gives it with this layer), by what you save, not by the
 medium it came from. Outside material kept for later (a post, video, message, article) with no more specific type
 → saved.
+A reflection → title "Reflection DD.MM.YYYY: <theme>" (the day it was written), the period in the period field. To find reflections: type reflection, newest first.
 Read the chosen type's file (system/dictionaries/note-types/<type>.yaml) once per chat, again when a change is
 reported. Its fields go into meta, by its format; leave out an optional field you don't know. A type with no file
 has only the common fields.

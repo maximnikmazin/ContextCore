@@ -54,36 +54,187 @@ function walk(dir, base, out) {
     const full = path.join(dir, e.name);
     const rel = base ? `${base}/${e.name}` : e.name;
     if (e.isDirectory()) walk(full, rel, out);
-    else if (e.name !== ".DS_Store" && e.name !== ".keep") out.push(rel);
+    else if (e.name !== ".DS_Store" && e.name !== ".keep" && !e.name.includes(TMP_MARK)) out.push(rel);
   }
 }
-function loadState(dir = STATE) {
-  if (!fs.existsSync(path.join(dir, "_server.json"))) throw new Error(`No state in ${dir}. Run: node cli.mjs reset`);
-  const files = new Map();
+const JOURNAL = ".journal.json";
+const MANIFEST = ".manifest.json";
+const TMP_MARK = ".tmp-cc-";
+const MAX_DELETES = 50;
+const MAX_MISSING = 5;
+class StorageFailure extends Error {
+  constructor(message, detail = {}) {
+    super(message);
+    this.code = "STORAGE_FAILURE";
+    this.detail = detail;
+  }
+}
+function fsyncDir(d) {
+  try {
+    const fd = fs.openSync(d, "r");
+    try {
+      fs.fsyncSync(fd);
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch {
+  }
+}
+function writeAtomic(full, data) {
+  fs.mkdirSync(path.dirname(full), { recursive: true });
+  const tmp = `${full}${TMP_MARK}${process.pid}-${crypto.randomBytes(4).toString("hex")}`;
+  const fd = fs.openSync(tmp, "w");
+  try {
+    fs.writeFileSync(fd, data);
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
+  fs.renameSync(tmp, full);
+  fsyncDir(path.dirname(full));
+}
+function listContent(dir) {
+  const out = [];
   for (const root of CONTENT_ROOTS) {
     const full = path.join(dir, root);
     if (!fs.existsSync(full)) continue;
-    const list = [];
-    if (fs.statSync(full).isDirectory()) walk(full, root, list);
-    else list.push(root);
-    for (const rel of list) files.set(rel, parseDoc(fs.readFileSync(path.join(dir, rel), "utf8")));
+    if (fs.statSync(full).isDirectory()) walk(full, root, out);
+    else out.push(root);
   }
-  const todo = JSON.parse(fs.readFileSync(path.join(dir, "todo.json"), "utf8"));
-  const server = JSON.parse(fs.readFileSync(path.join(dir, "_server.json"), "utf8"));
+  return out;
+}
+function countsOf(paths) {
+  const c = {};
+  for (const p of paths) {
+    const r = p.split("/")[0];
+    c[r] = (c[r] || 0) + 1;
+  }
+  return c;
+}
+function writeManifest(dir = STATE) {
+  writeAtomic(path.join(dir, MANIFEST), JSON.stringify({ at: (new Date()).toISOString(), counts: countsOf(listContent(dir)) }));
+}
+function checkManifest(dir, paths) {
+  let m = null;
+  try {
+    m = JSON.parse(fs.readFileSync(path.join(dir, MANIFEST), "utf8"));
+  } catch {
+    return;
+  }
+  const now = countsOf(paths);
+  const missing = {};
+  for (const [root, n] of Object.entries(m.counts || {})) if ((now[root] || 0) < n) missing[root] = n - (now[root] || 0);
+  const total = Object.values(missing).reduce((a, b) => a + b, 0);
+  if (total > MAX_MISSING) throw new StorageFailure(`${total} files are missing since the last save (${Object.entries(missing).map(([r, n]) => `${r}: ${n}`).join(", ")}).`, { missing, manifest_at: m.at });
+}
+function recoverJournal(dir = STATE) {
+  const j = path.join(dir, JOURNAL);
+  if (!fs.existsSync(j)) return false;
+  const J = JSON.parse(fs.readFileSync(j, "utf8"));
+  applyJournal(dir, J);
+  return true;
+}
+function applyJournal(dir, J) {
+  for (const [rel, data] of Object.entries(J.writes)) writeAtomic(path.join(dir, rel), data);
+  for (const rel of J.deletes) {
+    try {
+      fs.unlinkSync(path.join(dir, rel));
+    } catch (e) {
+      if (e.code !== "ENOENT") throw e;
+    }
+    removeEmptyDirs(dir, path.dirname(rel));
+  }
+  writeManifest(dir);
+  fs.unlinkSync(path.join(dir, JOURNAL));
+  fsyncDir(dir);
+}
+function removeEmptyDirs(dir, rel) {
+  while (rel && rel !== "." && !CONTENT_ROOTS.includes(rel)) {
+    try {
+      fs.rmdirSync(path.join(dir, rel));
+    } catch {
+      return;
+    }
+    rel = path.dirname(rel);
+  }
+}
+function diskBase(dir, files, todoRaw, serverRaw, changeCount) {
+  const canon = new Map();
+  for (const [rel, doc] of files) canon.set(rel, formatDoc(doc));
+  return { files: canon, todo: todoRaw, server: serverRaw, changeCount };
+}
+function loadState(dir = STATE) {
+  if (!fs.existsSync(path.join(dir, "_server.json"))) throw new Error(`No state in ${dir}. Run: node cli.mjs reset`);
+  recoverJournal(dir);
+  const paths = listContent(dir);
+  checkManifest(dir, paths);
+  const files = new Map();
+  for (const rel of paths) files.set(rel, parseDoc(fs.readFileSync(path.join(dir, rel), "utf8")));
+  const todoRaw = fs.readFileSync(path.join(dir, "todo.json"), "utf8");
+  const serverRaw = fs.readFileSync(path.join(dir, "_server.json"), "utf8");
+  const todo = JSON.parse(todoRaw);
+  const server = JSON.parse(serverRaw);
   server.chats ||= {};
   server.ops ||= {};
   server.changes ||= [];
-  return { files, todo, server };
+  const S = { files, todo, server };
+  Object.defineProperty(S, "disk", { value: diskBase(dir, files, todoRaw, serverRaw, server.changes.length), enumerable: false, writable: true, configurable: true });
+  return S;
 }
-function saveState(S, dir = STATE) {
-  for (const root of CONTENT_ROOTS) fs.rmSync(path.join(dir, root), { recursive: true, force: true });
-  for (const [rel, doc] of [...S.files.entries()].sort()) {
-    const full = path.join(dir, rel);
-    fs.mkdirSync(path.dirname(full), { recursive: true });
-    fs.writeFileSync(full, formatDoc(doc));
+function saveState(S, dir = STATE, base = S.disk) {
+  if (!base) {
+    const T = loadStateRaw(dir);
+    base = T.disk;
   }
-  fs.writeFileSync(path.join(dir, "todo.json"), JSON.stringify(S.todo, null, 1));
-  fs.writeFileSync(path.join(dir, "_server.json"), JSON.stringify(S.server, null, 1));
+  const writes = {};
+  const deletes = [];
+  const content = [];
+  for (const [rel, doc] of [...S.files.entries()].sort()) {
+    const raw = formatDoc(doc);
+    const old = base.files.get(rel);
+    if (old === raw) continue;
+    writes[rel] = raw;
+    if (old === void 0 || fileVersion(parseDoc(old)) !== fileVersion(doc)) content.push(rel);
+  }
+  for (const rel of base.files.keys()) if (!S.files.has(rel)) {
+    deletes.push(rel);
+    content.push(rel);
+  }
+  const todoRaw = JSON.stringify(S.todo, null, 1);
+  if (todoRaw !== base.todo) {
+    writes["todo.json"] = todoRaw;
+    content.push("todo.json");
+  }
+  const serverRaw = JSON.stringify(S.server, null, 1);
+  if (serverRaw !== base.server) writes["_server.json"] = serverRaw;
+  if (deletes.length) {
+    const explained = new Set((S.server.changes || []).slice(base.changeCount ?? 0).map((c) => c.path));
+    const unexplained = deletes.filter((p) => !explained.has(p));
+    if (unexplained.length) throw new StorageFailure(`A save would delete ${unexplained.length} files no operation asked to delete (${unexplained.slice(0, 3).join(", ")}${unexplained.length > 3 ? ", …" : ""}). Nothing was saved.`, { unexplained: unexplained.length });
+    if (deletes.length > MAX_DELETES) throw new StorageFailure(`A save would delete ${deletes.length} files at once (at most ${MAX_DELETES}). Nothing was saved.`, { deletes: deletes.length });
+  }
+  const paths = [...Object.keys(writes), ...deletes];
+  if (!paths.length) return { paths, content, deletes };
+  writeAtomic(path.join(dir, JOURNAL), JSON.stringify({ at: (new Date()).toISOString(), writes, deletes }));
+  applyJournal(dir, { writes, deletes });
+  const next = { files: new Map(base.files), todo: writes["todo.json"] ?? base.todo, server: writes["_server.json"] ?? base.server, changeCount: (S.server.changes || []).length };
+  for (const [rel, raw] of Object.entries(writes)) if (rel !== "todo.json" && rel !== "_server.json") next.files.set(rel, raw);
+  for (const rel of deletes) next.files.delete(rel);
+  Object.defineProperty(S, "disk", { value: next, enumerable: false, writable: true, configurable: true });
+  return { paths, content, deletes };
+}
+function loadStateRaw(dir) {
+  const files = new Map();
+  for (const rel of listContent(dir)) files.set(rel, parseDoc(fs.readFileSync(path.join(dir, rel), "utf8")));
+  const read = (f) => {
+    try {
+      return fs.readFileSync(path.join(dir, f), "utf8");
+    } catch {
+      return null;
+    }
+  };
+  const server = JSON.parse(read("_server.json") || "{}");
+  return { disk: diskBase(dir, files, read("todo.json"), read("_server.json"), (server.changes || []).length) };
 }
 const cloneState = (S) => ({ files: new Map([...S.files].map(([k, v]) => [k, structuredClone(v)])), todo: structuredClone(S.todo), server: structuredClone(S.server) });
 const hash = (s) => crypto.createHash("sha1").update(s).digest("hex").slice(0, 8);
@@ -1280,6 +1431,7 @@ export {
   HERE,
   OVERRIDES,
   STATE,
+  StorageFailure,
   WORLD,
   appendText,
   cloneState,
@@ -1297,6 +1449,7 @@ export {
   placeOfList,
   positionOf,
   projectRules,
+  recoverJournal,
   reset,
   rulesOf,
   runProgram,
@@ -1311,5 +1464,6 @@ export {
   sweep,
   taskVersion,
   todoListing,
-  whatsNew
+  whatsNew,
+  writeManifest
 };

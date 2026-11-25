@@ -12,6 +12,9 @@ Environment=NM_STATE=/opt/contextcore/state
 Environment=PORT=8798
 Environment=HOST=127.0.0.1
 Environment=GIT_BACKUP=1
+# the server pushes its versions to the private backup repo every 10 minutes, if the state has a remote `origin`
+Environment=JOBS=1
+Environment=BACKUP_KEY=/opt/contextcore/.ssh/backup_key
 ExecStart=/usr/bin/node server/server.mjs
 Restart=always
 RestartSec=3

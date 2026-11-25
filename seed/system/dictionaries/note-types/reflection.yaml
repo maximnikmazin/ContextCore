@@ -1,0 +1,7 @@
+type: reflection
+meaning: the owner looking back at a day or a period of the owner's life (a journal entry, a year or sprint review): what happened, how it felt, lessons
+fields:
+  period:
+    value: text
+    required: false
+    meaning: the day or period the note looks back at, e.g. "22.11.2026", "2025", "Sprint 1 2026"

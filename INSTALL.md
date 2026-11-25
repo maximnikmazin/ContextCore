@@ -60,10 +60,14 @@ the server log).
 ## 4. Backup (if the owner said yes)
 
 Make a private GitHub repo for the data, add a deploy key with write access (the private key in
-`/opt/contextcore/.ssh/backup_key`, owned by contextcore), add the remote as `deploy/backup.sh` says, then:
+`/opt/contextcore/.ssh/backup_key`, owned by contextcore), then add the remote and restart:
 ```
-cp deploy/backup.service deploy/backup.timer /etc/systemd/system/ && systemctl daemon-reload && systemctl enable --now backup.timer
+sudo -u contextcore git -C /opt/contextcore/state remote add origin git@github.com:<account>/<repo>.git && systemctl restart contextcore
 ```
+The server pushes every 10 minutes by itself. It never pushes a run of versions that deletes more than 50 files at
+once: it pauses the backup and opens a notice instead. A failed push opens a notice too; the next good push closes it.
+Upgrading from a version with `backup.timer`: `systemctl disable --now backup.timer` (the server does it now, and two
+writers in the store folder are exactly what lost data before).
 
 ## 5. Give the owner the link
 

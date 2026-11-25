@@ -7,7 +7,7 @@ not_for: ["an idea or something to keep → use contextcore-notes-1-rules","a ne
 requires: ["none"]
 created: 2026-10-25T03:00:00.000Z
 by: owner
-updated: 2026-11-07T16:17:54.671Z
+updated: 2026-11-19T19:10:59.290Z
 ---
 
 # Task rules
@@ -70,8 +70,11 @@ Capture
    Because: choosing a date does not preserve the work's context.
    Not: creating a task from a progress detail, or applying that detail to unrelated work found by search.
    Check: is each of the owner's details on its task?
-   Two names, both required on a new task: short — the 2-3 words the owner knows the task by (up to 40
-   characters; lists and briefs show only it), and title — the full name: what to do and with what (up to 100).
+   Two names, both required on a new task: short — clear on its own, with no other context (up to 40
+   characters; lists and briefs show only it): concrete verb + specific object + visible result, plus the people
+   involved ("Add language level buttons", not "Level quick actions"). Avoid vague verbs (handle, improve, work on)
+   and topic-only nouns ("Content filtering"). Test: a week later, can the owner start it without asking what it
+   means?, and title — the full name: what to do and with what (up to 100).
    Keep the short name when the work stays the same; change it only when the work changes or the owner renames it.
    Description: up to 120 characters (who, why, the next step). Links, paths, longer notes → add_comment.
 6. Dates, from start's "now" (night hours: the shared rules):
@@ -107,6 +110,8 @@ Status
     Check: did the owner close the parent or approve closing it?
 12. Not a task: an idea, something to look into someday, a thing to keep (the owner's notes, by the placement
     rule). An event already in the owner's calendar → not a task.
+    Do not create tasks like "accept or answer a meeting invite": at work nobody accepts invites, people just
+    show up.
 13. Existing open tasks cover the same work → name them and ask whether to merge; during capture, rule 1 first.
     After a yes: cancel the smaller one, add_comment "merged: <its title>" on the main one.
 14. Never change dates, levels, statuses or order the owner did not ask for. Prefer no dates on tasks unless the owner
@@ -120,7 +125,7 @@ Showing tasks
     "Today": every task due today or overdue (deadline or day), whatever its level, with its section's name;
     then each section in order, without those tasks; a section with levels gets one group per level
     ("<project> high"). Number tasks from 1 again in each group. Don't continue the numbers across groups. Every top task, no steps: its number and its short name (a task with none yet: its 2-3 most meaningful words), with its
-    open-step count: "2. Pricing page [3]". A deadline past or within 3 days → "(due DD.MM)"; a day of today →
+    open-step count: "2. Pricing page [3]". Exception, a section split into epics: each epic is its own bold group ("<project>: Onboarding"), with its open steps numbered under it by short name, no step count; a step with its own open steps shows their count. A deadline past or within 3 days → "(due DD.MM)"; a day of today →
     "(today)". Empty groups are left out. No closing line. Waiting tasks stay in low; no separate Wait group.
     A task whose description or comment has "start: YYYY-MM-DD" after the current week (Mon to Sun) is left out of
     the brief until that week; a start date is not a deadline. The current week is Monday to Sunday and includes today. Leave out a task if its start date is after this Sunday. The full list shows it with "(starts DD.MM)".
