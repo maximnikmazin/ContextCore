@@ -394,6 +394,7 @@ function makeView(S) {
     typeFiles: () => v.paths().filter((p) => /^system\/dictionaries\/note-types\/[^/]+\.yaml$/.test(p)),
     dict: (name) => C.parseDict(S.files.get(`system/dictionaries/${name}.md`)?.text || "").values,
     closedStatuses: () => new Set(v.dict("task-statuses").filter((d) => d.closed).map((d) => d.value)),
+    taskLimits: () => C.taskLimitsFrom(v.dict("task-limits")),
     dictDefault: (name, fallback) => v.dict(name).find((d) => d.default)?.value || fallback,
     projects: () => {
       const out = {};

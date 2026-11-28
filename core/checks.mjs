@@ -39,12 +39,23 @@ const BRAIN_META = ["title", "type", "origin", "source", "original", "summary", 
 const SERVER_META = ["unused", "created", "by", "updated", "last_hit", "archived_at", "told_at", "installed"];
 const PROJECT_ROOT_FILES = ["README.md", "STATUS.md", "CRITERIA.md"];
 const PROJECT_PLACES = [...PROJECT_ROOT_FILES, "tasks/<YYMMDD-name>/task.md", "context/<folder>/<file>.md"];
-const DICTS = { "note-types": "types", "task-statuses": "tasks", "task-priority": "tasks" };
-const DICT_MARKS = { "note-types": [], "task-statuses": ["default", "closed"], "task-priority": ["default"] };
+const DICTS = { "note-types": "types", "task-statuses": "tasks", "task-priority": "tasks", "task-limits": "system" };
+const DICT_MARKS = { "note-types": [], "task-statuses": ["default", "closed"], "task-priority": ["default"], "task-limits": [] };
+const DICT_OPTIONAL = ["task-limits"];
 const TASK_FIELDS = ["id", "version", "short", "title", "status", "priority", "position", "parent", "project", "vector", "description", "deadline", "day", "comment", "add_comment"];
-const SHORT_MAX = 40;
-const TITLE_MAX = 100;
-const DESCRIPTION_MAX = 120;
+const TASK_LIMIT_DEFAULTS = { short: 40, title: 100, description: 120 };
+const TASK_LIMIT_BOUNDS = { min: 10, max: 2e3 };
+const TASK_LIMITS_PATH = "system/dictionaries/task-limits.md";
+const LIMIT_RE = /^(\d+)(?!\S)/;
+function taskLimitsFrom(values) {
+  const out = { ...TASK_LIMIT_DEFAULTS };
+  for (const v of values || []) {
+    const m = String(v.meaning || "").match(LIMIT_RE);
+    const n = m && Number(m[1]);
+    if (v.value in out && n >= TASK_LIMIT_BOUNDS.min && n <= TASK_LIMIT_BOUNDS.max) out[v.value] = n;
+  }
+  return out;
+}
 const TASK_SERVER_FIELDS = ["created", "by", "updated", "closed_at", "children", "parent_all_done", "has_comment", "section"];
 const SPACES = ["brain", "todo", "projects", "agents", "skills", "system", "archive"];
 const CHANGE_KEYS = ["text", "replace", "append", "meta", "move_to"];
@@ -133,7 +144,7 @@ function classify(path, agent, view) {
       }
       if (parts[1] === "dictionaries" && parts.length === 3) {
         const dict = parts[2].replace(/\.md$/, "");
-        if (!DICTS[dict] || !view.file(path)) throw refuse("UNKNOWN_FOLDER", `There is no dictionary "${parts[2]}".`, "These are the dictionaries.", { path, allowed: Object.entries(DICT_LINES).map(([d, w]) => `system/dictionaries/${d}.md — ${w}`) });
+        if (!DICTS[dict] || !view.file(path) && !DICT_OPTIONAL.includes(dict)) throw refuse("UNKNOWN_FOLDER", `There is no dictionary "${parts[2]}".`, "These are the dictionaries.", { path, allowed: Object.entries(DICT_LINES).map(([d, w]) => `system/dictionaries/${d}.md — ${w}`) });
         return { area: "dictionary", dict };
       }
       if (parts[1] === "notices" && parts.length === 3) return { area: "notice", name: parts[2] };
@@ -504,7 +515,18 @@ function checkDictionary({ view, agent, path, cls, existing, next }) {
   if (DICT_MARKS[cls.dict].includes("default") && values.filter((v) => v.default).length !== 1) throw refuse("BAD_LINE", 'Exactly one line needs "(default)".', `Format: ${fmt}`, { path });
   const names = values.map((v) => v.value);
   if (new Set(names).size !== names.length) throw refuse("BAD_LINE", "A value is listed twice.", `Format: ${fmt}`, { path });
-  for (const v of parseDict(existing.text).values.map((d) => d.value).filter((x) => !names.includes(x))) {
+  if (cls.dict === "task-limits") {
+    const fields = Object.keys(TASK_LIMIT_DEFAULTS);
+    const odd = names.find((n) => !fields.includes(n));
+    if (odd) throw refuse("UNKNOWN_FIELD", `"${odd}" is not a task field with a limit.`, `Use only: ${fields.join(", ")}. Format: ${fmt}`, { path, field: odd, allowed: fields });
+    for (const v of values) {
+      const m = v.meaning.match(LIMIT_RE);
+      const n = m && Number(m[1]);
+      if (!(n >= TASK_LIMIT_BOUNDS.min && n <= TASK_LIMIT_BOUNDS.max)) throw refuse("BAD_LINE", `"${v.value} — ${v.meaning}" needs a number of characters from ${TASK_LIMIT_BOUNDS.min} to ${TASK_LIMIT_BOUNDS.max} right after the dash.`, `Format: ${fmt}`, { path, field: v.value });
+    }
+    return { setMeta: {} };
+  }
+  for (const v of parseDict(existing ? existing.text : "").values.map((d) => d.value).filter((x) => !names.includes(x))) {
     const n = view.valueUses(cls.dict, v);
     if (n > 0) throw refuse("IN_USE", `"${v}" is used by ${n} ${cls.dict === "note-types" ? "notes" : "tasks"}, so it can't be removed.`, "Move those to another value first, or keep this value.", { path, field: v });
   }
@@ -610,12 +632,14 @@ function checkTask({ view, agent, input, existing, currentVersion, madeInRun = f
   if (input.id !== void 0 && input.id !== null && !existing) throw refuse("NOT_FOUND", `There is no task ${input.id}.`, 'Leave out id to make a new task, or take the id from nm.list("todo") / nm.find({query, in: "todo"}).', { path: `todo/${input.id}`, field: "id" });
   if (existing) checkVersion({ exists: true, version: input.version, currentVersion, current: view.taskOut(existing), path, madeInRun });
   if (!existing && !has(input.title)) throw refuse("MISSING_FIELD", "A new task needs a title.", 'Pass title: "<what to do>" (an action).', { path, field: "title" });
+  const { short: SHORT_MAX, title: TITLE_MAX, description: DESCRIPTION_MAX } = view.taskLimits ? view.taskLimits() : TASK_LIMIT_DEFAULTS;
+  const where = `The limits are in ${TASK_LIMITS_PATH} (system right).`;
   if (!existing && !has(input.short)) throw refuse("MISSING_FIELD", "A new task needs a short name.", `Pass short: 2-3 words the owner knows the task by (up to ${SHORT_MAX} characters), next to the full title.`, { path, field: "short" });
   if (input.short !== void 0 && (typeof input.short !== "string" || !input.short.trim())) throw refuse("UNKNOWN_VALUE", "short must be non-empty text.", 'Pass short: "<2-3 words>".', { path, field: "short" });
-  if (typeof input.short === "string" && input.short.trim().length > SHORT_MAX) throw refuse("TOO_LONG", `short has ${input.short.trim().length} characters; at most ${SHORT_MAX}.`, `Short name: 2-3 words, up to ${SHORT_MAX} characters; the full name goes in title.`, { path, field: "short" });
+  if (typeof input.short === "string" && input.short.trim().length > SHORT_MAX) throw refuse("TOO_LONG", `short has ${input.short.trim().length} characters; at most ${SHORT_MAX}.`, `Short name: 2-3 words, up to ${SHORT_MAX} characters; the full name goes in title. ${where}`, { path, field: "short" });
   if (input.title !== void 0 && (typeof input.title !== "string" || !input.title.trim())) throw refuse("UNKNOWN_VALUE", "title must be non-empty text.", 'Pass title: "<what to do>".', { path, field: "title" });
-  if (typeof input.title === "string" && input.title.trim().length > TITLE_MAX) throw refuse("TOO_LONG", `title has ${input.title.trim().length} characters; at most ${TITLE_MAX}.`, `Title: the full name of the task in up to ${TITLE_MAX} characters. Details → description (up to ${DESCRIPTION_MAX}).`, { path, field: "title" });
-  if (input.description !== void 0 && input.description !== null && (typeof input.description !== "string" || input.description.length > DESCRIPTION_MAX)) throw refuse("TOO_LONG", `description must be text of at most ${DESCRIPTION_MAX} characters.`, `Keep the description to ${DESCRIPTION_MAX} characters; anything longer → add_comment.`, { path, field: "description" });
+  if (typeof input.title === "string" && input.title.trim().length > TITLE_MAX) throw refuse("TOO_LONG", `title has ${input.title.trim().length} characters; at most ${TITLE_MAX}.`, `Title: the full name of the task in up to ${TITLE_MAX} characters. Details → description (up to ${DESCRIPTION_MAX}). ${where}`, { path, field: "title" });
+  if (input.description !== void 0 && input.description !== null && (typeof input.description !== "string" || input.description.length > DESCRIPTION_MAX)) throw refuse("TOO_LONG", `description must be text of at most ${DESCRIPTION_MAX} characters.`, `Keep the description to ${DESCRIPTION_MAX} characters; anything longer → add_comment. ${where}`, { path, field: "description" });
   const withMeaning = (d) => view.dict(d).map((x) => `${x.value} — ${x.meaning}`);
   if (input.status !== void 0 && !view.dict("task-statuses").some((x) => x.value === input.status)) throw refuse("UNKNOWN_VALUE", `status ${JSON.stringify(input.status)} is not allowed.`, 'Use a status from allowed (the name before "—").', { path, field: "status", allowed: withMeaning("task-statuses") });
   if (input.priority !== void 0 && !view.dict("task-priority").some((x) => x.value === input.priority)) throw refuse("UNKNOWN_VALUE", `priority ${JSON.stringify(input.priority)} is not allowed.`, 'Use a priority from allowed (the name before "—").', { path, field: "priority", allowed: withMeaning("task-priority") });
@@ -684,7 +708,6 @@ export {
   BRAIN_META,
   CHANGE_KEYS,
   CONFIG,
-  DESCRIPTION_MAX,
   DICTS,
   DICT_LINE_RE,
   LAYER_ORDER,
@@ -701,14 +724,15 @@ export {
   SELF_RIGHTS,
   SERVER_META,
   SHAPE_CODES,
-  SHORT_MAX,
   SKILL_PATH_FIX,
   SPACES,
   SUMMARY_MAX,
   TAG_LINE_FORMAT,
   TASK_FIELDS,
+  TASK_LIMITS_PATH,
+  TASK_LIMIT_BOUNDS,
+  TASK_LIMIT_DEFAULTS,
   TASK_SERVER_FIELDS,
-  TITLE_MAX,
   TYPE_FILE_FORMAT,
   VECTORS,
   VECTOR_ORDER,
@@ -740,6 +764,7 @@ export {
   sameCodeRefused,
   serverFields,
   skillRights,
+  taskLimitsFrom,
   topCount,
   vectorLines
 };

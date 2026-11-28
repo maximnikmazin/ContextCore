@@ -1,3 +1,5 @@
+Rule #1, never break it: save every rule, fact and decision from the owner to ContextCoreMCP right away, without being reminded; never use the app's own memory for them, it keeps only the pointer note. Why: other agents working with the owner read only ContextCoreMCP, so anything not saved there makes them act wrongly, and it gets lost. Your own memory.md and the project: save right away. Shared rules, About the owner and skills: show the owner the exact line first and save after his yes. The write failed → say it is not saved to ContextCoreMCP, and save it nowhere else.
+
 ## Authority, scope and approval
 
 Apply these shared rules to every turn. Your layer skills define their own operations.
@@ -64,7 +66,6 @@ When the owner …
 - A correction to a recurring way of working applies next time too, unless limited to this occasion. Earlier decisions stay settled until the owner changes them. A change is a clear instruction, correction or choice; questions, possible options and thinking aloud change no earlier decision. Unclear, and it would change what is saved or done → ask before that change. A clear change needs no second confirmation; the rights and approval rules still apply.
 - Where a rule or fact goes: "Where things go", questions 2, 5 and 6.
 - memory.md is what you need to remember for your own job, and what you copied from your app's memory until the review sorts it: one line each. Every fact line, here and in About the owner, ends with its true source and date ("owner, DD.MM", "<app name> memory, DD.MM"): the date the owner said it, or else the date it entered ContextCoreMCP; a line that moves keeps its date. A rule you thought of yourself is not the owner's: offer it, and save it only after the owner's yes. A fact that ends on a known date says so ("until DD.MM"); a newer fact replaces the old line. Keep it short; never put your rules in it.
-- Save every new rule or fact here, in agent.md or memory.md, not in your app's memory: your app keeps only the note that points here. The write failed → say it is not saved to ContextCoreMCP, and save it nowhere else.
 - Your own agent.md and memory.md need no extra approval when the owner directs the change. The shared rules, About the owner and skills need the owner's yes ("Ask first"). Any agent may add a skill after that yes; you change only skills you made, and a layer's skill (tasks, notes, system, types) only with its right.
 
 Removing a rule or fact.
@@ -76,7 +77,7 @@ Check: does the stored change match exactly what the owner withdrew or replaced?
 
 ## Your app's memory
 
-Your app keeps only the short note that points here (contextcore-agent-1-setup step 6); everything to keep lives in ContextCoreMCP. Your app's memory says something else → ContextCoreMCP wins; never copy it back. A new fact or rule from the owner → save it here, not in your app.
+Your app keeps only the short note that points here (contextcore-agent-1-setup step 6); everything to keep lives in ContextCoreMCP. Your app's memory says something else → ContextCoreMCP wins; never copy it back.
 
 ## Dates and time
 

@@ -15,10 +15,11 @@ const DICT_LINES = {
   "note-types": `one line per type: "<name> — <meaning>"; a type with its own fields has note-types/<type>.yaml. Types and system rights. A value in use can't be removed.`,
   "task-statuses": 'one line per status: "<name> — <meaning>"; "(default)" on one line; "(closed)" if it counts as closed. Tasks right.',
   "task-priority": 'one line per level, top level first: "<name> — <meaning>"; "(default)" on one line. Tasks right.',
+  "task-limits": 'most characters per task field, one line each: "<field> — <number>" for short, title, description; a missing file or line uses the server default. System right.',
   "note-types-suggestions": 'note types used in notes but not in note-types.md, one line "<type> | <note path> | <date>"; the server adds the lines. Types right.'
 };
 const SYSTEM_LINES = [
-  ["dictionaries/", "allowed values: note types and their files note-types/<type>.yaml (types and system rights), task statuses and priority (tasks right)"],
+  ["dictionaries/", "allowed values: note types and their files note-types/<type>.yaml (types and system rights), task statuses and priority (tasks right), task field limits (system right)"],
   ["notices/", "server notices for agents with the notices right; only told may change"]
 ];
 const AGENT_LINES = {
@@ -204,6 +205,7 @@ function listSystem() {
 }
 function listDictionaries(view, agent) {
   const out = Object.entries(DICT_LINES).filter(([d]) => view.file(`system/dictionaries/${d}.md`) && (d !== "note-types-suggestions" || view.has(agent, "types"))).map(([d, w]) => it(`system/dictionaries/${d}.md`, `${d}.md`, w, { version: view.version(`system/dictionaries/${d}.md`) }));
+  if (!view.file("system/dictionaries/task-limits.md") && view.taskLimits) out.push(it("system/dictionaries/task-limits.md", "task-limits.md", `${DICT_LINES["task-limits"]} Not written yet, so now: ${Object.entries(view.taskLimits()).map(([k, n]) => `${k} ${n}`).join(", ")}.`));
   const files = view.paths().filter((p) => /^system\/dictionaries\/note-types\/[^/]+\.yaml$/.test(p));
   if (files.length) out.push(it("system/dictionaries/note-types/", "note-types/", `one file per note type with its own fields: ${files.map((p) => p.split("/").pop()).join(", ")}`));
   return out;

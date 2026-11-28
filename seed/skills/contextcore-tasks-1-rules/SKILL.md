@@ -7,7 +7,7 @@ not_for: ["an idea or something to keep → use contextcore-notes-1-rules","a ne
 requires: ["none"]
 created: 2026-10-25T03:00:00.000Z
 by: owner
-updated: 2026-11-19T19:10:59.290Z
+updated: 2026-11-28T09:57:35.236Z
 ---
 
 # Task rules
@@ -70,13 +70,13 @@ Capture
    Because: choosing a date does not preserve the work's context.
    Not: creating a task from a progress detail, or applying that detail to unrelated work found by search.
    Check: is each of the owner's details on its task?
-   Two names, both required on a new task: short — clear on its own, with no other context (up to 40
-   characters; lists and briefs show only it): concrete verb + specific object + visible result, plus the people
+   Two names, both required on a new task: short — clear on its own, with no other context (within its limit in
+   system/dictionaries/task-limits.md, which only the system right changes; lists and briefs show only it): concrete verb + specific object + visible result, plus the people
    involved ("Add language level buttons", not "Level quick actions"). Avoid vague verbs (handle, improve, work on)
    and topic-only nouns ("Content filtering"). Test: a week later, can the owner start it without asking what it
-   means?, and title — the full name: what to do and with what (up to 100).
+   means?, and title — the full name: what to do and with what (within its limit there).
    Keep the short name when the work stays the same; change it only when the work changes or the owner renames it.
-   Description: up to 120 characters (who, why, the next step). Links, paths, longer notes → add_comment.
+   Description: within its limit there (who, why, the next step). Links, paths, longer notes → add_comment.
 6. Dates, from start's "now" (night hours: the shared rules):
    deadline — done by that day (any "by when", exact or relative; "today" too, for every thing it is said about).
    day — done on that day (an event, an appointment).
